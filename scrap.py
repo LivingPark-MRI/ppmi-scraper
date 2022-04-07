@@ -28,7 +28,7 @@ def downloadMetadata():
     clickButton('//*[@id="ygtvlabelel56"]')
 
     # Click all document checkboxes
-    for checkbox in driver.find_elements_by_xpath("//input[@type='checkbox']")[0:1]:
+    for checkbox in driver.find_elements_by_xpath("//input[@type='checkbox']")[0:2]:
         checkbox.click()
 
     clickButton('//*[@id="downloadBtn"]')
