@@ -25,15 +25,16 @@ class PPMIMetaDataDownloader():
         '''
         # Ids of the download checkboxes in the PPMI metadata download page
         self.file_ids = {
-            'demographics': 2544,
-            'age at visit': 2834,
-            'rem sbdq': 2472,
-            'mri': 2583
+            'Demographics.csv': 2544,
+            'Age_at_visit.csv': 2834,
+            'REM_Sleep_Behavior_Disorder_Questionnaire.csv': 2472,
+            'Magnetic_Resonance_Imaging__MRI_.csv': 2655
         }
         self.email = email
         self.password = password
 
-    def download_metadata(self, file_ids, headless=True, timeout=120):
+    def download_metadata(self, file_ids,
+                          headless=True, timeout=120, destination_dir='.'):
         '''
         Download metadata files from PPMI. Requires Google Chrome.
 
@@ -41,8 +42,9 @@ class PPMIMetaDataDownloader():
         * file_ids: list of file ids included in self.file_ids.keys
 
         Keyword arguments:
-        * headless: if False, run Chrome not headless.
-        * timeout: file download timeout, in seconds.
+        * headless: if False, run Chrome not headless
+        * timeout: file download timeout, in seconds
+        * destination_dir: directory where to store the downloaded files
         '''
 
         if not type(file_ids) is list:
@@ -103,10 +105,11 @@ class PPMIMetaDataDownloader():
         if file_name.endswith('.zip'):
             # unzip file to cwd
             with zipfile.ZipFile(op.join(tempdir, file_name), 'r') as zip_ref:
-                zip_ref.extractall('.')
+                zip_ref.extractall(destination_dir)
                 print(f'Successfully downloaded files {zip_ref.namelist()}')
         else:
-            os.rename(op.join(tempdir, file_name), file_name)
+            os.rename(op.join(tempdir, file_name),
+                      op.join(destination_dir, file_name))
             print(f'Successfully downloaded file {file_name}')
         
         # Remove tempdir
