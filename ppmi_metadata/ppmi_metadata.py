@@ -36,6 +36,101 @@ class PPMIMetaDataDownloader():
         self.email = email
         self.password = password
 
+    def download_imaging_data(self, subject_ids,
+                            headless=True, timeout=600, destination_dir='.'):
+        '''
+        Download all imaging data files from PPMI. Requires Google Chrome.
+
+        Positional arguments
+        * subject_ids: list of subject ids
+
+        Keyword arguments:
+        * headless: if False, run Chrome not headless
+        * timeout: file download timeout, in seconds
+        * destination_dir: directory where to store the downloaded files
+        '''
+
+        subjectIds = ','.join([str(i) for i in subject_ids])
+
+        # Create Chrome webdriver
+        options = webdriver.ChromeOptions()
+        tempdir = op.abspath(tempfile.mkdtemp(dir='.'))
+        prefs = {'download.default_directory': tempdir}
+        options.add_experimental_option("prefs", prefs)
+        if headless:
+            options.add_argument("--headless")
+
+        self.driver = webdriver.Chrome(ChromeDriverManager().install(), chrome_options=options)
+
+        # Login to PPMI
+        self.driver.get('https://ida.loni.usc.edu/login.jsp?project=PPMI')
+        self.html = HTMLHelper(self.driver)
+        self.html.click_button("//div[contains(@class,'ida-cookie-policy-accept')]")
+        self.html.click_button("//div[contains(@class,'ida-user-menu-icon')]")
+        self._login(self.email, self.password)
+
+        # navigate to search page
+        self.driver.get('https://ida.loni.usc.edu/home/projectPage.jsp?project=PPMI')
+        self.html.click_button("//a[text()='SEARCH']")
+        self.html.click_button("//a[text()='Advanced Image Search (beta)']")
+        time.sleep(2)
+
+        # Enter id's and add to collection
+        self.html.enter_data('//*[@id="subjectIdText"]', subjectIds)
+        time.sleep(2)
+        self.html.click_button('//*[@id="advSearchQuery"]')
+        time.sleep(2)
+        self.html.click_button('//*[@id="advResultSelectAll"]')
+        time.sleep(3)
+        self.html.click_button('//*[@id="advResultAddCollectId"]')
+        time.sleep(2)
+        self.html.enter_data('//*[@id="nameText"]', "images")
+        time.sleep(3)
+        self.html.click_button('//*[text()="OK"]')
+        time.sleep(2)
+        self.html.click_button('//*[@id="selectAllCheckBox"]')
+        time.sleep(2)
+        self.html.click_button('//*[@id="simple-download-button"]')
+
+        # Download imaging data and metadata
+        self.html.click_button('//*[@id="simple-download-link"]')
+        time.sleep(2)
+        self.html.click_button(('//*[@class="simple-download-metadata-link-text singlefile-download-metadata-link"]'))
+
+        # Wait for download to complete
+        def download_complete(driver):
+            downloaded_files = os.listdir(tempdir)
+            assert(len(downloaded_files) <= 2)
+            if len(downloaded_files) == 0:
+                return False
+            f = downloaded_files[0]
+            if f.endswith('.crdownload'):
+                return False
+            assert(f.endswith('.csv') or f.endswith('.zip'))
+            return True
+        WebDriverWait(self.driver, timeout).until(download_complete)
+
+        # Move file to cwd or extract zip file
+        downloaded_files = os.listdir(tempdir)
+
+        # we got imaging data and metadata
+        assert(len(downloaded_files) == 2)
+
+        for file_name in downloaded_files:
+            assert(file_name.endswith('.zip') or file_name.endswith('.csv'))
+            if file_name.endswith('.zip'):
+                # unzip file to cwd
+                with zipfile.ZipFile(op.join(tempdir, file_name), 'r') as zip_ref:
+                    zip_ref.extractall(destination_dir)
+                    print(f'Successfully downloaded files {zip_ref.namelist()}')
+            else:
+                os.rename(op.join(tempdir, file_name),
+                        op.join(destination_dir, file_name))
+                print(f'Successfully downloaded file {file_name}')
+        
+        # Remove tempdir
+        shutil.rmtree(tempdir, ignore_errors=True)
+
     def download_metadata(self, file_ids,
                           headless=True, timeout=120, destination_dir='.'):
         '''
