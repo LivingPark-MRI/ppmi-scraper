@@ -28,7 +28,10 @@ class PPMIMetaDataDownloader():
             'Demographics.csv': 2544,
             'Age_at_visit.csv': 2834,
             'REM_Sleep_Behavior_Disorder_Questionnaire.csv': 2472,
-            'Magnetic_Resonance_Imaging__MRI_.csv': 2655
+            'Magnetic_Resonance_Imaging__MRI_.csv': 2655,
+            'MDS_UPDRS_Part_III.csv': 2796,
+            'Socio-Economics.csv': 2576,
+            'Montreal_Cognitive_Assessment__MoCA_.csv': 2712
         }
         self.email = email
         self.password = password
@@ -53,7 +56,7 @@ class PPMIMetaDataDownloader():
         for file_name in file_ids:
             if file_name not in self.file_ids:
                 raise Exception(f'Unsupported file name: {file_name}.'
-                                'Supported files: {file_ids.keys}')
+                                f'Supported files: {file_ids.keys}')
 
         # Create Chrome webdriver
         options = webdriver.ChromeOptions()
@@ -68,10 +71,12 @@ class PPMIMetaDataDownloader():
         # Login to PPMI
         self.driver.get('https://ida.loni.usc.edu/login.jsp?project=PPMI')
         self.html = HTMLHelper(self.driver)
+        self.html.click_button("//div[contains(@class,'ida-cookie-policy-accept')]")
+        self.html.click_button("//div[contains(@class,'ida-user-menu-icon')]")
         self._login(self.email, self.password)
 
         # navigate to metadata page
-        self.html.click_button("//div[contains(@class,'header-login-button-inside')]")
+        self.driver.get('https://ida.loni.usc.edu/home/projectPage.jsp?project=PPMI')
         self.html.click_button("//a[text()='Download']")
         self.html.click_button("//a[text()='Study Data']")
         self.html.click_button('//*[@id="ygtvlabelel56"]')
@@ -116,11 +121,11 @@ class PPMIMetaDataDownloader():
         shutil.rmtree(tempdir, ignore_errors=True)
 
     def _login(self, email, password):
-        password_field = '//*[@id="userPassword"]'
-        email_field = '//*[@id="userEmail"]'
-        login_button = '//button[text()="LOGIN"]'
+        password_field = '/html/body/div[1]/div[2]/div/div/div[2]/div[4]/div[2]/div/div[1]/form/div[1]/div[2]/div/div/input'
+        email_field = '/html/body/div[1]/div[2]/div/div/div[2]/div[4]/div[2]/div/div[1]/form/div[1]/div[1]/div/div/input'
         self.html.enter_data(email_field, email)
         self.html.enter_data(password_field, password)
+        self.html.click_button('/html/body/div[1]/div[2]/div/div/div[2]/div[4]/div[2]/div/div[1]/form/div[2]/span')
 
 
 class HTMLHelper():
