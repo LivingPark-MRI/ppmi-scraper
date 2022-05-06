@@ -185,14 +185,6 @@ class PPMIDownloader():
         # Remove tempdir
         shutil.rmtree(tempdir, ignore_errors=True)
 
-    def _login(self, email, password):
-        password_field = '/html/body/div[1]/div[2]/div/div/div[2]/div[4]/div[2]/div/div[1]/form/div[1]/div[2]/div/div/input'
-        email_field = '/html/body/div[1]/div[2]/div/div/div[2]/div[4]/div[2]/div/div[1]/form/div[1]/div[1]/div/div/input'
-        self.html.enter_data(email_field, email)
-        self.html.enter_data(password_field, password)
-        self.html.click_button('/html/body/div[1]/div[2]/div/div/div[2]/div[4]/div[2]/div/div[1]/form/div[2]/span')
-
-
 class HTMLHelper():
 
     def __init__(self, driver) -> None:
