@@ -9,9 +9,17 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.wait import WebDriverWait
 from webdriver_manager.chrome import ChromeDriverManager
 
+def get_driver(headless, tempdir):
+    # Create Chrome webdriver
+    options = webdriver.ChromeOptions()
+    prefs = {'download.default_directory': tempdir}
+    options.add_experimental_option("prefs", prefs)
+    if headless:
+        options.add_argument("--headless")
 
+    return webdriver.Chrome(ChromeDriverManager().install(), chrome_options=options)
 
-class PPMIMetaDataDownloader():
+class PPMIDownloader():
     '''
     A downloader of PPMI metadata. Requires a PPMI account.
     See function download_metadata for usage.
@@ -53,21 +61,13 @@ class PPMIMetaDataDownloader():
         subjectIds = ','.join([str(i) for i in subject_ids])
 
         # Create Chrome webdriver
-        options = webdriver.ChromeOptions()
         tempdir = op.abspath(tempfile.mkdtemp(dir='.'))
-        prefs = {'download.default_directory': tempdir}
-        options.add_experimental_option("prefs", prefs)
-        if headless:
-            options.add_argument("--headless")
-
-        self.driver = webdriver.Chrome(ChromeDriverManager().install(), chrome_options=options)
+        self.driver = get_driver(headless, tempdir)
 
         # Login to PPMI
         self.driver.get('https://ida.loni.usc.edu/login.jsp?project=PPMI')
         self.html = HTMLHelper(self.driver)
-        self.html.click_button("//div[contains(@class,'ida-cookie-policy-accept')]")
-        self.html.click_button("//div[contains(@class,'ida-user-menu-icon')]")
-        self._login(self.email, self.password)
+        self.html.login(self.email, self.password)
 
         # navigate to search page
         self.driver.get('https://ida.loni.usc.edu/home/projectPage.jsp?project=PPMI')
@@ -106,7 +106,7 @@ class PPMIMetaDataDownloader():
             f = downloaded_files[0]
             if f.endswith('.crdownload'):
                 return False
-            assert(f.endswith('.csv') or f.endswith('.zip'))
+            assert(f.endswith('.csv') or f.endswith('.zip') or f.endswith('.dcm'))
             return True
         WebDriverWait(self.driver, timeout).until(download_complete)
 
@@ -116,17 +116,8 @@ class PPMIMetaDataDownloader():
         # we got imaging data and metadata
         assert(len(downloaded_files) == 2)
 
-        for file_name in downloaded_files:
-            assert(file_name.endswith('.zip') or file_name.endswith('.csv'))
-            if file_name.endswith('.zip'):
-                # unzip file to cwd
-                with zipfile.ZipFile(op.join(tempdir, file_name), 'r') as zip_ref:
-                    zip_ref.extractall(destination_dir)
-                    print(f'Successfully downloaded files {zip_ref.namelist()}')
-            else:
-                os.rename(op.join(tempdir, file_name),
-                        op.join(destination_dir, file_name))
-                print(f'Successfully downloaded file {file_name}')
+        # unzip files
+        self.html.unzip_imaging_data(downloaded_files, tempdir, destination_dir)
         
         # Remove tempdir
         shutil.rmtree(tempdir, ignore_errors=True)
@@ -154,21 +145,13 @@ class PPMIMetaDataDownloader():
                                 f'Supported files: {file_ids.keys}')
 
         # Create Chrome webdriver
-        options = webdriver.ChromeOptions()
         tempdir = op.abspath(tempfile.mkdtemp(dir='.'))
-        prefs = {'download.default_directory': tempdir}
-        options.add_experimental_option("prefs", prefs)
-        if headless:
-            options.add_argument("--headless")
-
-        self.driver = webdriver.Chrome(ChromeDriverManager().install(), chrome_options=options)
+        self.driver = get_driver(headless, tempdir)
 
         # Login to PPMI
         self.driver.get('https://ida.loni.usc.edu/login.jsp?project=PPMI')
         self.html = HTMLHelper(self.driver)
-        self.html.click_button("//div[contains(@class,'ida-cookie-policy-accept')]")
-        self.html.click_button("//div[contains(@class,'ida-user-menu-icon')]")
-        self._login(self.email, self.password)
+        self.html.login(self.email, self.password)
 
         # navigate to metadata page
         self.driver.get('https://ida.loni.usc.edu/home/projectPage.jsp?project=PPMI')
@@ -192,25 +175,12 @@ class PPMIMetaDataDownloader():
             f = downloaded_files[0]
             if f.endswith('.crdownload'):
                 return False
-            assert(f.endswith('.csv') or f.endswith('.zip'))
+            assert(f.endswith('.csv') or f.endswith('.zip')), f"file ends with: {f}"
             return True
         WebDriverWait(self.driver, timeout).until(download_complete)
 
         # Move file to cwd or extract zip file
-        downloaded_files = os.listdir(tempdir)
-        # we got either a csv or a zip file
-        assert(len(downloaded_files) == 1)
-        file_name = downloaded_files[0]
-        assert(file_name.endswith('.zip') or file_name.endswith('.csv'))
-        if file_name.endswith('.zip'):
-            # unzip file to cwd
-            with zipfile.ZipFile(op.join(tempdir, file_name), 'r') as zip_ref:
-                zip_ref.extractall(destination_dir)
-                print(f'Successfully downloaded files {zip_ref.namelist()}')
-        else:
-            os.rename(op.join(tempdir, file_name),
-                      op.join(destination_dir, file_name))
-            print(f'Successfully downloaded file {file_name}')
+        self.html.unzip_metadata(tempdir, destination_dir)
         
         # Remove tempdir
         shutil.rmtree(tempdir, ignore_errors=True)
@@ -244,3 +214,45 @@ class HTMLHelper():
         except Exception:
             time.sleep(1)
             self.click_button(xpath)
+
+    def login(self, email, password):
+        self.driver.get('https://ida.loni.usc.edu/login.jsp?project=PPMI')
+        self.click_button("//div[contains(@class,'ida-cookie-policy-accept')]")
+        self.click_button("//div[contains(@class,'ida-user-menu-icon')]")
+        
+        password_field = '/html/body/div[1]/div[2]/div/div/div[2]/div[4]/div[2]/div/div[1]/form/div[1]/div[2]/div/div/input'
+        email_field = '/html/body/div[1]/div[2]/div/div/div[2]/div[4]/div[2]/div/div[1]/form/div[1]/div[1]/div/div/input'
+        self.enter_data(email_field, email)
+        self.enter_data(password_field, password)
+        self.click_button('/html/body/div[1]/div[2]/div/div/div[2]/div[4]/div[2]/div/div[1]/form/div[2]/span')
+
+    def unzip_metadata(self, tempdir, destination_dir):
+        # Move file to cwd or extract zip file
+        downloaded_files = os.listdir(tempdir)
+        # we got either a csv or a zip file
+        assert(len(downloaded_files) == 1)
+        file_name = downloaded_files[0]
+        assert(file_name.endswith('.zip') or file_name.endswith('.csv'))
+
+        if file_name.endswith('.zip'):
+            # unzip file to cwd
+            with zipfile.ZipFile(op.join(tempdir, file_name), 'r') as zip_ref:
+                zip_ref.extractall(destination_dir)
+                print(f'Successfully downloaded files {zip_ref.namelist()}')
+        else:
+            os.rename(op.join(tempdir, file_name),
+                      op.join(destination_dir, file_name))
+            print(f'Successfully downloaded file {file_name}')
+
+    def unzip_imaging_data(self, downloaded_files, tempdir, destination_dir):
+        for file_name in downloaded_files:
+            assert(file_name.endswith('.zip') or file_name.endswith('.csv') or file_name.endswith('.dcm'))
+            if file_name.endswith('.zip'):
+                # unzip file to cwd
+                with zipfile.ZipFile(op.join(tempdir, file_name), 'r') as zip_ref:
+                    zip_ref.extractall(destination_dir)
+                    print(f'Successfully downloaded files {zip_ref.namelist()}')
+            else:
+                os.rename(op.join(tempdir, file_name),
+                        op.join(destination_dir, file_name))
+                print(f'Successfully downloaded file {file_name}')
