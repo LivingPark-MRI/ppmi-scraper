@@ -84,7 +84,7 @@ class PPMIDownloader():
         time.sleep(3)
         self.html.click_button('//*[@id="advResultAddCollectId"]')
         time.sleep(2)
-        self.html.enter_data('//*[@id="nameText"]', "images")
+        self.html.enter_data('//*[@id="nameText"]', f"images-{op.basename(tempdir)}")
         time.sleep(3)
         self.html.click_button('//*[text()="OK"]')
         time.sleep(2)
@@ -106,7 +106,7 @@ class PPMIDownloader():
             f = downloaded_files[0]
             if f.endswith('.crdownload'):
                 return False
-            assert(f.endswith('.csv') or f.endswith('.zip') or f.endswith('.dcm'))
+            assert(f.endswith('.csv') or f.endswith('.zip') or f.endswith('.dcm') or f.endswith('.xml'))
             return True
         WebDriverWait(self.driver, timeout).until(download_complete)
 
@@ -238,7 +238,7 @@ class HTMLHelper():
 
     def unzip_imaging_data(self, downloaded_files, tempdir, destination_dir):
         for file_name in downloaded_files:
-            assert(file_name.endswith('.zip') or file_name.endswith('.csv') or file_name.endswith('.dcm'))
+            assert(file_name.endswith('.zip') or file_name.endswith('.csv') or file_name.endswith('.dcm') or file_name.endswith('.xml'))
             if file_name.endswith('.zip'):
                 # unzip file to cwd
                 with zipfile.ZipFile(op.join(tempdir, file_name), 'r') as zip_ref:
