@@ -39,7 +39,8 @@ class PPMIDownloader():
             'Magnetic_Resonance_Imaging__MRI_.csv': 2655,
             'MDS_UPDRS_Part_III.csv': 2796,
             'Socio-Economics.csv': 2576,
-            'Montreal_Cognitive_Assessment__MoCA_.csv': 2712
+            'Montreal_Cognitive_Assessment__MoCA_.csv': 2712,
+            'Age_of_Parkinson_s_Disease_Diagnosis__Online_.csv': 2853
         }
         self.email = email
         self.password = password
@@ -106,7 +107,7 @@ class PPMIDownloader():
             f = downloaded_files[0]
             if f.endswith('.crdownload'):
                 return False
-            assert(f.endswith('.csv') or f.endswith('.zip') or f.endswith('.dcm') or f.endswith('.xml'))
+            assert(f.endswith('.csv') or f.endswith('.zip') or f.endswith('.dcm') or f.endswith('.xml')), f
             return True
         WebDriverWait(self.driver, timeout).until(download_complete)
 
@@ -142,7 +143,7 @@ class PPMIDownloader():
         for file_name in file_ids:
             if file_name not in self.file_ids:
                 raise Exception(f'Unsupported file name: {file_name}.'
-                                f'Supported files: {file_ids.keys}')
+                                f'Supported files: {self.file_ids}')
 
         # Create Chrome webdriver
         tempdir = op.abspath(tempfile.mkdtemp(dir='.'))
@@ -157,7 +158,7 @@ class PPMIDownloader():
         self.driver.get('https://ida.loni.usc.edu/home/projectPage.jsp?project=PPMI')
         self.html.click_button("//a[text()='Download']")
         self.html.click_button("//a[text()='Study Data']")
-        self.html.click_button('//*[@id="ygtvlabelel56"]')
+        self.html.click_button('//*[@id="ygtvlabelel71"]')
 
         # select file and download
         for file_name in file_ids:
@@ -238,7 +239,7 @@ class HTMLHelper():
 
     def unzip_imaging_data(self, downloaded_files, tempdir, destination_dir):
         for file_name in downloaded_files:
-            assert(file_name.endswith('.zip') or file_name.endswith('.csv') or file_name.endswith('.dcm') or file_name.endswith('.xml'))
+            assert(file_name.endswith('.zip') or file_name.endswith('.csv') or file_name.endswith('.dcm') or file_name.endswith('.xml')), file_name
             if file_name.endswith('.zip'):
                 # unzip file to cwd
                 with zipfile.ZipFile(op.join(tempdir, file_name), 'r') as zip_ref:
