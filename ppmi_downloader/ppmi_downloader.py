@@ -40,7 +40,9 @@ class PPMIDownloader():
             'MDS_UPDRS_Part_III.csv': 2796,
             'Socio-Economics.csv': 2576,
             'Montreal_Cognitive_Assessment__MoCA_.csv': 2712,
-            'Age_of_Parkinson_s_Disease_Diagnosis__Online_.csv': 2853
+            'Age_of_Parkinson_s_Disease_Diagnosis__Online_.csv': 2853,
+            'PD_Diagnosis_History.csv': 2588,
+            'PPMI_Original_Cohort_BL_to_Year_5_Dataset_Apr2020.csv': 2203
         }
         self.email = email
         self.password = password
