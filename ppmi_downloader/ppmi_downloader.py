@@ -42,7 +42,9 @@ class PPMIDownloader():
             'Montreal_Cognitive_Assessment__MoCA_.csv': 2712,
             'Age_of_Parkinson_s_Disease_Diagnosis__Online_.csv': 2853,
             'PD_Diagnosis_History.csv': 2588,
-            'PPMI_Original_Cohort_BL_to_Year_5_Dataset_Apr2020.csv': 2203
+            'PPMI_Original_Cohort_BL_to_Year_5_Dataset_Apr2020.csv': 2203,
+            'Participant_Status.csv' : 2543
+        
         }
         self.email = email
         self.password = password
