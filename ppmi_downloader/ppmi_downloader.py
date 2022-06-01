@@ -43,7 +43,9 @@ class PPMIDownloader():
             'Age_of_Parkinson_s_Disease_Diagnosis__Online_.csv': 2853,
             'PD_Diagnosis_History.csv': 2588,
             'PPMI_Original_Cohort_BL_to_Year_5_Dataset_Apr2020.csv': 2203,
-            'Participant_Status.csv' : 2543
+            'Participant_Status.csv' : 2543,
+            'Inclusion_Exclusion.csv': 2696,
+            'Inclusion_Exclusion-Archived.csv': 34
         
         }
         self.email = email
