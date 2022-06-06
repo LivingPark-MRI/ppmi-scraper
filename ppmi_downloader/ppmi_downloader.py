@@ -45,7 +45,9 @@ class PPMIDownloader():
             'PPMI_Original_Cohort_BL_to_Year_5_Dataset_Apr2020.csv': 2203,
             'Participant_Status.csv' : 2543,
             'Inclusion_Exclusion.csv': 2696,
-            'Inclusion_Exclusion-Archived.csv': 34
+            'Inclusion_Exclusion-Archived.csv': 34,
+            'Concomitant_Medication_Log.csv': 2701,
+            'MRI_Metadata.csv': 2583
         
         }
         self.email = email
@@ -125,6 +127,55 @@ class PPMIDownloader():
 
         # unzip files
         self.html.unzip_imaging_data(downloaded_files, tempdir, destination_dir)
+        
+        # Remove tempdir
+        shutil.rmtree(tempdir, ignore_errors=True)
+
+    def download_3D_mri_info(self, headless=True, timeout=120, destination_dir='.'):
+        '''
+        Download csv file containing information about available 3D MRIs
+
+        Keyword arguments:
+        * headless: if False, run Chrome not headless
+        * timeout: file download timeout, in seconds
+        * destination_dir: directory where to store the downloaded files
+        '''
+         # Create Chrome webdriver
+        tempdir = op.abspath(tempfile.mkdtemp(dir='.'))
+        self.driver = get_driver(headless, tempdir)
+
+        # Login to PPMI
+        self.driver.get('https://ida.loni.usc.edu/login.jsp?project=PPMI')
+        self.html = HTMLHelper(self.driver)
+        self.html.login(self.email, self.password)
+
+        # navigate to metadata page
+        self.driver.get('https://ida.loni.usc.edu/home/projectPage.jsp?project=PPMI')
+        self.html.click_button("//a[text()='Download']")
+        self.html.click_button("//a[text()='Image Collections']")
+        # Click Advanced Search button
+        self.html.click_button("/html/body/div[3]/table/tbody/tr[2]/td/div/ul/li[2]/a/em/font")
+        # Click 3D checkbox
+        self.html.click_button('//*[@id="imgProtocol_checkBox1.Acquisition_Type.3D"]')
+        self.html.click_button('//*[@id="advSearchQuery"]')
+        # Click CSV Download button
+        self.html.click_button("/html/body/div[2]/table/tbody/tr[2]/td/div/div/div[3]/form/table/tbody/tr/td[2]/table[1]/tbody/tr/td/table/tbody/tr/td[3]/table/tbody/tr/td[5]/input")
+
+        # Wait for download to complete
+        def download_complete(driver):
+            downloaded_files = os.listdir(tempdir)
+            assert(len(downloaded_files) <= 1)
+            if len(downloaded_files) == 0:
+                return False
+            f = downloaded_files[0]
+            if f.endswith('.crdownload'):
+                return False
+            assert(f.endswith('.csv')), f"file ends with: {f}"
+            return True
+        WebDriverWait(self.driver, timeout).until(download_complete)
+
+        # Move file to cwd or extract zip file
+        self.html.unzip_metadata(tempdir, destination_dir)
         
         # Remove tempdir
         shutil.rmtree(tempdir, ignore_errors=True)
