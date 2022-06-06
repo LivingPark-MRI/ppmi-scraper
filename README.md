@@ -4,7 +4,7 @@ A downloader of PPMI metadata and imaging data files.
 
 ```
 import ppmi_downloader
-ppmi = ppmi_downloader.PPMIDownloader(<ppmi_login>, <ppmi_password>)
+ppmi = ppmi_downloader.PPMIDownloader()
 
 # Download metadata files
 ppmi.download_metadata(['Demographics.csv', 'Age_at_visit.csv'])

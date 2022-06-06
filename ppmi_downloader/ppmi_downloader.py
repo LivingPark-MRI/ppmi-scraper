@@ -8,6 +8,7 @@ from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.wait import WebDriverWait
 from webdriver_manager.chrome import ChromeDriverManager
+from configparser import SafeConfigParser
 
 def get_driver(headless, tempdir):
     # Create Chrome webdriver
@@ -25,7 +26,7 @@ class PPMIDownloader():
     See function download_metadata for usage.
     '''
 
-    def __init__(self, email, password):
+    def __init__(self, config_file='.ppmi_config'):
         '''
         Positional arguments:
         * email: PPMI account email address
@@ -50,7 +51,52 @@ class PPMIDownloader():
             'MRI_Metadata.csv': 2583
         
         }
-        self.email = email
+        self.config_file = config_file
+        self.__set_credentials()
+    
+    def __set_credentials(self):
+        '''
+        Set PPMI credentials by (1) looking in config file (default:
+        .ppmi_config in current working directory), (2) looking in
+        environment variables PPMI_LOGIN and PPMI_PASSWORD, (3) prompting
+        the user.
+        '''
+
+        # These variables will be set by the configuration
+        login = None
+        password = None
+
+        read_config = False  # will set to True if credentials are read from config file
+
+        # look in .ppmi_config
+        if op.exists(self.config_file):
+            config = SafeConfigParser()
+            config.read('.ppmi_config')
+            login = config.get('ppmi', 'login')
+            password = config.get('ppmi', 'password')
+            read_config = True
+
+        if login is None or password is None:
+            # read environment variables
+            login = os.environ.get('PPMI_LOGIN')
+            password = os.environ.get('PPMI_PASSWORD')
+        
+        if login is None or password is None:
+            # prompt user
+            login = input('PPMI login: ')
+            password = input('PPMI password: ')
+
+        if not read_config:
+            # write .ppmi_config
+            config = SafeConfigParser()
+            config.read(self.config_file)
+            config.add_section('ppmi')
+            config.set('ppmi', 'login', login)
+            config.set('ppmi', 'password', password)
+            with open(self.config_file, 'w') as f:
+                config.write(f)
+
+        self.login = login
         self.password = password
 
     def download_imaging_data(self, subject_ids,
