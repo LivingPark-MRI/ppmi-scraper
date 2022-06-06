@@ -10,7 +10,7 @@ ppmi = ppmi_downloader.PPMIDownloader(<ppmi_login>, <ppmi_password>)
 ppmi.download_metadata(['Demographics.csv', 'Age_at_visit.csv'])
 
 # Download 3D imaging metadata
-ppmi.download_3D_mri_info()
+ppmi.download_3D_T1_info()
 
 # Download imaging data
 ppmi.download_imaging_data([3001, 3003, 3011])
