@@ -131,7 +131,7 @@ class PPMIDownloader():
         # Remove tempdir
         shutil.rmtree(tempdir, ignore_errors=True)
 
-    def download_3D_mri_info(self, headless=True, timeout=120, destination_dir='.'):
+    def download_3D_T1_info(self, headless=True, timeout=120, destination_dir='.'):
         '''
         Download csv file containing information about available 3D MRIs
 
@@ -157,6 +157,12 @@ class PPMIDownloader():
         self.html.click_button("/html/body/div[3]/table/tbody/tr[2]/td/div/ul/li[2]/a/em/font")
         # Click 3D checkbox
         self.html.click_button('//*[@id="imgProtocol_checkBox1.Acquisition_Type.3D"]')
+        # Click T1 checkbox
+        self.html.click_button('//*[@id="imgProtocol_checkBox1.Weighting.T1"]')
+        # Click checkbox to display visit name in resuls
+        self.html.click_button('//*[@id="RESET_VISIT.0"]')
+
+        # Click search button
         self.html.click_button('//*[@id="advSearchQuery"]')
         # Click CSV Download button
         self.html.click_button("/html/body/div[2]/table/tbody/tr[2]/td/div/div/div[3]/form/table/tbody/tr/td[2]/table[1]/tbody/tr/td/table/tbody/tr/td[3]/table/tbody/tr/td[5]/input")
