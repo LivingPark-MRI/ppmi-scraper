@@ -175,10 +175,12 @@ class PPMIDownloader():
         WebDriverWait(self.driver, timeout).until(download_complete)
 
         # Move file to cwd or extract zip file
-        self.html.unzip_metadata(tempdir, destination_dir)
+        file_name = self.html.unzip_metadata(tempdir, destination_dir)
         
         # Remove tempdir
         shutil.rmtree(tempdir, ignore_errors=True)
+
+        return file_name
 
     def download_metadata(self, file_ids,
                           headless=True, timeout=120, destination_dir='.'):
@@ -293,6 +295,7 @@ class HTMLHelper():
             os.rename(op.join(tempdir, file_name),
                       op.join(destination_dir, file_name))
             print(f'Successfully downloaded file {file_name}')
+        return file_name
 
     def unzip_imaging_data(self, downloaded_files, tempdir, destination_dir):
         for file_name in downloaded_files:
@@ -306,3 +309,4 @@ class HTMLHelper():
                 os.rename(op.join(tempdir, file_name),
                         op.join(destination_dir, file_name))
                 print(f'Successfully downloaded file {file_name}')
+        return downloaded_files
