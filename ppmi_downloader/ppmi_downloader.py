@@ -96,7 +96,7 @@ class PPMIDownloader():
             with open(self.config_file, 'w') as f:
                 config.write(f)
 
-        self.login = login
+        self.email = login
         self.password = password
 
     def download_imaging_data(self, subject_ids,
