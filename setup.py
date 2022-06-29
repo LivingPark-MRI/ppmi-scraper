@@ -5,7 +5,7 @@ DEPS = [ 'webdriver_manager', 'selenium']
 
 setup(
     name='ppmi_downloader',
-    version='0.1.1',
+    version='0.2',
     description='A downloader of PPMI files.',
     author='Tristan Glatard',
     author_email='tristan.glatard@concordia.ca',
