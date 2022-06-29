@@ -143,6 +143,8 @@ class PPMIDownloader():
         time.sleep(3)
         self.html.click_button('//*[text()="OK"]')
         time.sleep(2)
+        self.html.click_button('//*[@id="export"]')
+        time.sleep(2)
         self.html.click_button('//*[@id="selectAllCheckBox"]')
         time.sleep(2)
         self.html.click_button('//*[@id="simple-download-button"]')
@@ -155,12 +157,12 @@ class PPMIDownloader():
         # Wait for download to complete
         def download_complete(driver):
             downloaded_files = os.listdir(tempdir)
-            assert(len(downloaded_files) <= 2)
+            assert(len(downloaded_files) <= 3)
             if len(downloaded_files) == 0:
                 return False
-            f = downloaded_files[0]
-            if f.endswith('.crdownload'):
-                return False
+            for f in downloaded_files:
+                if f.endswith('.crdownload'):
+                    return False
             assert(f.endswith('.csv') or f.endswith('.zip') or f.endswith('.dcm') or f.endswith('.xml')), f
             return True
         WebDriverWait(self.driver, timeout).until(download_complete)
@@ -169,7 +171,7 @@ class PPMIDownloader():
         downloaded_files = os.listdir(tempdir)
 
         # we got imaging data and metadata
-        assert(len(downloaded_files) == 2)
+        assert(len(downloaded_files) == 3)
 
         # unzip files
         self.html.unzip_imaging_data(downloaded_files, tempdir, destination_dir)
