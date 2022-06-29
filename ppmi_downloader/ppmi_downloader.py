@@ -324,8 +324,8 @@ class HTMLHelper():
         self.click_button("//div[contains(@class,'ida-cookie-policy-accept')]")
         self.click_button("//div[contains(@class,'ida-user-menu-icon')]")
         
-        password_field = '/html/body/div[1]/div[2]/div/div/div[2]/div[4]/div[2]/div/div[1]/form/div[1]/div[2]/div/div/input'
-        email_field = '/html/body/div[1]/div[2]/div/div/div[2]/div[4]/div[2]/div/div[1]/form/div[1]/div[1]/div/div/input'
+        password_field = '/html/body/div[1]/div[2]/div/div/div[2]/div[4]/div[2]/div/div[1]/form/div[1]/div[2]/input'
+        email_field = '/html/body/div[1]/div[2]/div/div/div[2]/div[4]/div[2]/div/div[1]/form/div[1]/div[1]/input'
         self.enter_data(email_field, email)
         self.enter_data(password_field, password)
         self.click_button('/html/body/div[1]/div[2]/div/div/div[2]/div[4]/div[2]/div/div[1]/form/div[2]/span')
