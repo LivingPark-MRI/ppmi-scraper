@@ -48,8 +48,8 @@ class PPMIDownloader():
             'Inclusion_Exclusion.csv': 2696,
             'Inclusion_Exclusion-Archived.csv': 34,
             'Concomitant_Medication_Log.csv': 2701,
-            'MRI_Metadata.csv': 2583
-        
+            'MRI_Metadata.csv': 2583,
+            "Cognitive_Categorization.csv": 2708,
         }
         self.config_file = config_file
         self.__set_credentials()
