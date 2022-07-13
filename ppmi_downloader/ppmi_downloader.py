@@ -5,6 +5,7 @@ import time
 import shutil
 import zipfile
 from selenium import webdriver
+from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.wait import WebDriverWait
 from webdriver_manager.chrome import ChromeDriverManager
@@ -196,6 +197,7 @@ class PPMIDownloader():
         self.driver.get('https://ida.loni.usc.edu/login.jsp?project=PPMI')
         self.html = HTMLHelper(self.driver)
         self.html.login(self.email, self.password)
+        print("after login")
 
         # navigate to metadata page
         self.driver.get('https://ida.loni.usc.edu/home/projectPage.jsp?project=PPMI')
@@ -304,32 +306,30 @@ class HTMLHelper():
     def __init__(self, driver) -> None:
         self.driver = driver
 
-    def enter_data(self, field, data):
+    def enter_data(self, field, data, BY=By.XPATH):
         try:
-            self.driver.find_element_by_xpath(field).send_keys(data)
+            self.driver.find_element(BY, field).send_keys(data)
             pass
         except Exception as e:
             print(e)
             time.sleep(1)
-            self.enter_data(field, data)
+            self.enter_data(field, data, BY=BY)
 
-    def click_button(self, xpath):
+    def click_button(self, field, BY=By.XPATH):
         try:
-            self.driver.find_element_by_xpath(xpath).click()
+            self.driver.find_element(BY, field).click()
             pass
         except Exception:
             time.sleep(1)
-            self.click_button(xpath)
+            self.click_button(field, BY=BY)
 
     def login(self, email, password):
         self.driver.get('https://ida.loni.usc.edu/login.jsp?project=PPMI')
-        self.click_button("//div[contains(@class,'ida-cookie-policy-accept')]")
-        self.click_button("//div[contains(@class,'ida-user-menu-icon')]")
-        
-        password_field = '/html/body/div[1]/div[2]/div/div/div[2]/div[4]/div[2]/div/div[1]/form/div[1]/div[2]/input'
-        email_field = '/html/body/div[1]/div[2]/div/div/div[2]/div[4]/div[2]/div/div[1]/form/div[1]/div[1]/input'
-        self.enter_data(email_field, email)
-        self.enter_data(password_field, password)
+        self.click_button("ida-cookie-policy-accept", BY=By.CLASS_NAME)
+        self.click_button("ida-user-menu-icon", BY=By.CLASS_NAME)
+
+        self.enter_data("userEmail", email, BY=By.NAME)
+        self.enter_data("userPassword", password, BY=By.NAME)
         self.click_button('/html/body/div[1]/div[2]/div/div/div[2]/div[4]/div[2]/div/div[1]/form/div[2]/span')
 
     def unzip_metadata(self, tempdir, destination_dir):
