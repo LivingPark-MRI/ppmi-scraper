@@ -1,5 +1,6 @@
 import os
 from os import path as op
+import getpass
 import tempfile
 import time
 import shutil
@@ -28,9 +29,10 @@ class PPMIDownloader():
 
     def __init__(self, config_file='.ppmi_config'):
         '''
-        Positional arguments:
-        * email: PPMI account email address
-        * password: PPMI account password
+        Initializes PPMI downloader. Set PPMI credentials by (1) looking in
+        config file (default: .ppmi_config in current working directory),
+        (2) looking in environment variables PPMI_LOGIN and PPMI_PASSWORD,
+        (3) prompting the user.
         '''
         # Ids of the download checkboxes in the PPMI metadata download page
         self.file_ids = {
@@ -84,7 +86,7 @@ class PPMIDownloader():
         if login is None or password is None:
             # prompt user
             login = input('PPMI login: ')
-            password = input('PPMI password: ')
+            password = getpass.getpass('PPMI password: ')
 
         if not read_config:
             # write .ppmi_config
