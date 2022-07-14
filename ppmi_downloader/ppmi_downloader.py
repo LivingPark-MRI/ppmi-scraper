@@ -103,7 +103,7 @@ class PPMIDownloader():
         self.password = password
 
     def download_imaging_data(self, subject_ids,
-                            headless=True, timeout=600, destination_dir='.'):
+                            headless=True, timeout=600, destination_dir='.', type='archived'):
         '''
         Download all imaging data files from PPMI. Requires Google Chrome.
 
@@ -114,7 +114,10 @@ class PPMIDownloader():
         * headless: if False, run Chrome not headless
         * timeout: file download timeout, in seconds
         * destination_dir: directory where to store the downloaded files
+        * type: can be 'archived' or 'nifti'. Archived means that the images are downloaded as archived in the PPMI database, which usually means in DICOM format.
         '''
+
+        assert(type in ('archived', 'nifti')), f'Invalid type: {type}. Only "archived" and "nifti" are supported'
 
         subjectIds = ','.join([str(i) for i in subject_ids])
 
@@ -150,6 +153,10 @@ class PPMIDownloader():
         time.sleep(2)
         self.html.click_button('//*[@id="selectAllCheckBox"]')
         time.sleep(2)
+        if type == 'nifti':
+            self.html.click_button('//*[@id="niftiButton"]')
+        elif type =='archived':
+            self.html.click_button('//*[@id="archivedButton"]')
         self.html.click_button('//*[@id="simple-download-button"]')
 
         # Download imaging data and metadata
