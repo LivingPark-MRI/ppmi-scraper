@@ -280,7 +280,7 @@ class PPMIDownloader():
         # select file and download
         for file_name in file_ids:
             xpath = f'//input[@id={self.file_ids[file_name]}]'
-            for checkbox in self.driver.find_elements_by_xpath(xpath)[0:2]:
+            for checkbox in self.driver.find_elements(By.XPATH, xpath)[0:2]:
                 checkbox.click()
         self.html.click_button('//*[@id="downloadBtn"]')
 
