@@ -11,6 +11,10 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.wait import WebDriverWait
 from webdriver_manager.chrome import ChromeDriverManager
 from configparser import SafeConfigParser
+import glob
+import xml.etree.ElementTree as ET
+import os.path as op
+from pathlib import Path
 
 
 def get_driver(headless, tempdir):
@@ -73,10 +77,10 @@ class PPMIDownloader:
 
         read_config = False  # will set to True if credentials are read from config file
 
-        # look in .ppmi_config
+        # look in config file
         if op.exists(self.config_file):
             config = SafeConfigParser()
-            config.read(".ppmi_config")
+            config.read(self.config_file)
             login = config.get("ppmi", "login")
             password = config.get("ppmi", "password")
             read_config = True
@@ -92,7 +96,7 @@ class PPMIDownloader:
             password = getpass.getpass("PPMI password: ")
 
         if not read_config:
-            # write .ppmi_config
+            # write config file
             config = SafeConfigParser()
             config.read(self.config_file)
             config.add_section("ppmi")
@@ -129,6 +133,9 @@ class PPMIDownloader:
             "archived",
             "nifti",
         ), f'Invalid type: {type}. Only "archived" and "nifti" are supported'
+
+        if len(subject_ids) == 0:
+            return
 
         subjectIds = ",".join([str(i) for i in subject_ids])
 
@@ -385,7 +392,7 @@ class HTMLHelper:
             # unzip file to cwd
             with zipfile.ZipFile(op.join(tempdir, file_name), "r") as zip_ref:
                 zip_ref.extractall(destination_dir)
-                print(f"Successfully downloaded files {zip_ref.namelist()}")
+                print(f"Successfully downloaded files {zip_ref.namelist()[:2]}...")
         else:
             os.rename(op.join(tempdir, file_name), op.join(destination_dir, file_name))
             print(f"Successfully downloaded file {file_name}")
@@ -403,10 +410,178 @@ class HTMLHelper:
                 # unzip file to cwd
                 with zipfile.ZipFile(op.join(tempdir, file_name), "r") as zip_ref:
                     zip_ref.extractall(destination_dir)
-                    print(f"Successfully downloaded files {zip_ref.namelist()}")
+                    print(f"Successfully downloaded files {zip_ref.namelist()[:2]}...")
             else:
                 os.rename(
                     op.join(tempdir, file_name), op.join(destination_dir, file_name)
                 )
                 print(f"Successfully downloaded file {file_name}")
         return downloaded_files
+
+
+class PPMINiftiFileFinder:
+    """
+    A class to find a Nifti file by subject ID, visit ID and protocol description
+    from a PPMI image collection. See function find_nifti for detailed usage.
+    """
+
+    def __init__(self, download_dir="PPMI"):
+        self.download_dir = download_dir
+        # Mapping between Study Data Event IDs and imaging visit names
+        self.visit_map = {
+            "SC": "Screening",
+            "BL": "Baseline",
+            "V04": "Month 12",
+            "V06": "Month 24",
+            "V08": "Month 36",
+            "V10": "Month 48",
+            "ST": "Symptomatic Therapy",
+            "U01": "Unscheduled Visit 01",
+            "U02": "Unscheduled Visit 02",
+            "PW": "Premature Withdrawal",
+        }
+
+    def __parse_xml_metadata(self, xml_file):
+        """
+        Return (subject_id, visit_id, study_id, series_id, image_id, description) from XML metadata file.
+
+        Parameter:
+        * xml_file: PPMI XML image metadata file. Such files come with PPMI image collections.
+
+        Returned values:
+        * subject_id: Subject ID associated with the image.
+        * visit_id: Visit id of the image. Example: "Month 24".
+        * study_id: Study id of the image. Example: 12345.
+        * series_id: Series id of the image. Example: 123456.
+        * image_id: Image id of the image. Example: 123456.
+        * description: Protocol description of the image. Example: "MPRAGE GRAPPA"
+        """
+
+        tree = ET.parse(xml_file)
+        root = tree.getroot()
+
+        def parse_series(series):
+            assert series.tag == "series", xml_file
+            for child in series:
+                if child.tag == "seriesIdentifier":
+                    return child.text
+
+        def parse_protocol(protocol):
+            assert protocol.tag == "imagingProtocol", xml_file
+            for child in protocol:
+                if child.tag == "imageUID":
+                    image_id = child.text
+                if child.tag == "description":
+                    description = child.text
+            return (image_id, description)
+
+        def parse_study(study):
+            assert study.tag == "study", xml_file
+            for study_child in study:
+                if study_child.tag == "studyIdentifier":
+                    study_id = study_child.text
+                if study_child.tag == "series":
+                    series_id = parse_series(study_child)
+                if study_child.tag == "imagingProtocol":
+                    image_id, description = parse_protocol(study_child)
+            return (study_id, series_id, image_id, description)
+
+        def parse_visit(visit):
+            assert visit.tag == "visit", xml_file
+            for visit_child in visit:
+                if visit_child.tag == "visitIdentifier":
+                    return visit_child.text
+            raise Exception(f"Visit identifier not found in visit {visit}")
+
+        def parse_subject(subject):
+            assert subject.tag == "subject", xml_file
+            subject_id, visit_id, study_id, series_id, image_id, description = (
+                None for x in range(6)
+            )
+            for child in subject:
+                if child.tag == "subjectIdentifier":
+                    subject_id = child.text
+                if child.tag == "visit":
+                    visit_id = parse_visit(child)
+                if child.tag == "study":
+                    study_id, series_id, image_id, description = parse_study(child)
+            assert not None in (
+                subject_id,
+                visit_id,
+                study_id,
+                series_id,
+                image_id,
+                description,
+            )
+            return (subject_id, visit_id, study_id, series_id, image_id, description)
+
+        for project in root:
+            if project.tag == "project":
+                for child in project:
+                    if child.tag == "subject":
+                        return parse_subject(child)
+        raise Exception(
+            "Malformed XML document"
+        )  # TODO: it'd be nice to have an XML schema to validate the file against
+
+    def find_nifti(self, subject_id, event_id, description):
+        """
+        Find the nifti file associated with subject, event and protocol description in the finder's download directory.
+        Raise an exception if file is not found: make sure you know what you're looking for!
+
+        Parameters:
+        * subject_id: Subject id of the sought file.
+        * event_id: Event id of the file. Example: "V06". Warning: this is not the image visit id but a one-to-one mapping exists (see self.visit_map).
+        * description: Protocol description of the file. Example: "MPRAGE GRAPPA".
+
+        Return values:
+        * Nifti file path corresponding to the subject, event, and protocol description.
+        * None if no file path is found
+        """
+
+        def clean_desc(desc):
+            return desc.replace(" ", "_").replace("(", "_").replace(")", "_")
+
+        subject_id = str(subject_id)
+
+        # Find metadata file for subject, event and description
+        expression = op.join(self.download_dir, f"PPMI_{subject_id}_*.xml")
+        xml_files = glob.glob(expression)
+        # print(f'Found {len(xml_files)} metadata files to inspect')
+
+        for xml_file in xml_files:
+            (
+                s_id,
+                visit_id,
+                study_id,
+                series_id,
+                image_id,
+                descr,
+            ) = self.__parse_xml_metadata(xml_file)
+            if (
+                (subject_id == s_id)
+                and (self.visit_map[event_id] == visit_id)
+                and (description == descr)
+            ):
+                expression = op.join(
+                    self.download_dir,
+                    subject_id,
+                    clean_desc(description),
+                    "*",
+                    f"S{series_id}",
+                    f"PPMI_{subject_id}_MR_{clean_desc(description)}_*_S{series_id}_I{image_id}.nii",
+                )
+                files = glob.glob(expression)
+                assert (
+                    len(files) == 1
+                ), f"Found {len(files)} files matching {expression} while exactly 1 was expected"
+                file_name = files[0]
+                assert op.exists(file_name), "This should never happen :)"
+                return file_name
+            # else:
+            #     print(f'File {xml_file} is for {(s_id, visit_id, study_id, series_id, image_id, descr)} while we are looking for {subject_id, self.visit_map[event_id], description}')
+
+        return None
+        # raise Exception(
+        #     f"Did not find any nifti file for subject {subject_id}, event {event_id} and protocol description {description}"
+        # )
