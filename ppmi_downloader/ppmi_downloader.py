@@ -569,7 +569,7 @@ class PPMINiftiFileFinder:
                     clean_desc(description),
                     "*",
                     f"S{series_id}",
-                    f"PPMI_{subject_id}_MR_{clean_desc(description)}_*_S{series_id}_I{image_id}.nii",
+                    f"PPMI_{subject_id}_MR_*_S{series_id}_I{image_id}.nii",
                 )
                 files = glob.glob(expression)
                 assert (
