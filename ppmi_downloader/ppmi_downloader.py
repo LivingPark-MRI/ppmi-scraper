@@ -540,7 +540,7 @@ class PPMINiftiFileFinder:
         """
 
         def clean_desc(desc):
-            return desc.replace(" ", "_").replace("(", "_").replace(")", "_")
+            return desc.replace(" ", "_").replace("(", "_").replace(")", "_").replace("/", "_")
 
         subject_id = str(subject_id)
 
