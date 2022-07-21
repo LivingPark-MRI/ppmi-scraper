@@ -1,0 +1,5 @@
+.eggs
+build
+dist
+ppmi_downloader.egg-info
+__pycache__
