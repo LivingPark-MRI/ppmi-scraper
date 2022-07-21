@@ -59,6 +59,10 @@ class PPMIDownloader:
             "Concomitant_Medication_Log.csv": 2701,
             "MRI_Metadata.csv": 2583,
             "Cognitive_Categorization.csv": 2708,
+            "iu_genetic_consensus_20220310.csv": 2967,
+            "PPMI_PD_Variants_Genetic_Status_WGS_20180921.csv": 1707,
+            "Neurological_Exam.csv": 2639,
+            "Primary_Clinical_Diagnosis.csv": 2574
         }
         self.config_file = config_file
         self.__set_credentials()
@@ -126,9 +130,9 @@ class PPMIDownloader:
         * headless: if False, run Chrome not headless
         * timeout: file download timeout, in seconds
         * destination_dir: directory where to store the downloaded files
-        * type: can be 'archived' or 'nifti'. Archived means that the images are downloaded as archived in the PPMI database, which usually means in DICOM format.
+        * type: can be 'archived' or 'nifti'. Archived means that the images are 
+        downloaded as archived in the PPMI database, which usually means in DICOM format.
         """
-
         assert type in (
             "archived",
             "nifti",
@@ -182,7 +186,7 @@ class PPMIDownloader:
         time.sleep(2)
         self.html.click_button(
             (
-                '//*[@class="simple-download-metadata-link-text singlefile-download-metadata-link"]'
+    '//*[@class="simple-download-metadata-link-text singlefile-download-metadata-link"]'
             )
         )
 
@@ -456,7 +460,6 @@ class PPMINiftiFileFinder:
         * image_id: Image id of the image. Example: 123456.
         * description: Protocol description of the image. Example: "MPRAGE GRAPPA"
         """
-
         tree = ET.parse(xml_file)
         root = tree.getroot()
 
@@ -526,12 +529,14 @@ class PPMINiftiFileFinder:
 
     def find_nifti(self, subject_id, event_id, description):
         """
-        Find the nifti file associated with subject, event and protocol description in the finder's download directory.
+        Find the nifti file associated with subject, event and protocol description 
+        in the finder's download directory.
         Raise an exception if file is not found: make sure you know what you're looking for!
 
         Parameters:
         * subject_id: Subject id of the sought file.
-        * event_id: Event id of the file. Example: "V06". Warning: this is not the image visit id but a one-to-one mapping exists (see self.visit_map).
+        * event_id: Event id of the file. Example: "V06". Warning: this is not the
+         image visit id but a one-to-one mapping exists (see self.visit_map).
         * description: Protocol description of the file. Example: "MPRAGE GRAPPA".
 
         Return values:
