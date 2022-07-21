@@ -62,7 +62,7 @@ class PPMIDownloader:
             "iu_genetic_consensus_20220310.csv": 2967,
             "PPMI_PD_Variants_Genetic_Status_WGS_20180921.csv": 1707,
             "Neurological_Exam.csv": 2639,
-            "Primary_Clinical_Diagnosis.csv": 2574
+            "Primary_Clinical_Diagnosis.csv": 2574,
         }
         self.config_file = config_file
         self.__set_credentials()
@@ -130,7 +130,7 @@ class PPMIDownloader:
         * headless: if False, run Chrome not headless
         * timeout: file download timeout, in seconds
         * destination_dir: directory where to store the downloaded files
-        * type: can be 'archived' or 'nifti'. Archived means that the images are 
+        * type: can be 'archived' or 'nifti'. Archived means that the images are
         downloaded as archived in the PPMI database, which usually means in DICOM format.
         """
         assert type in (
@@ -186,7 +186,7 @@ class PPMIDownloader:
         time.sleep(2)
         self.html.click_button(
             (
-    '//*[@class="simple-download-metadata-link-text singlefile-download-metadata-link"]'
+                '//*[@class="simple-download-metadata-link-text singlefile-download-metadata-link"]'
             )
         )
 
@@ -529,7 +529,7 @@ class PPMINiftiFileFinder:
 
     def find_nifti(self, subject_id, event_id, description):
         """
-        Find the nifti file associated with subject, event and protocol description 
+        Find the nifti file associated with subject, event and protocol description
         in the finder's download directory.
         Raise an exception if file is not found: make sure you know what you're looking for!
 
@@ -545,7 +545,12 @@ class PPMINiftiFileFinder:
         """
 
         def clean_desc(desc):
-            return desc.replace(" ", "_").replace("(", "_").replace(")", "_").replace("/", "_")
+            return (
+                desc.replace(" ", "_")
+                .replace("(", "_")
+                .replace(")", "_")
+                .replace("/", "_")
+            )
 
         subject_id = str(subject_id)
 
