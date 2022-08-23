@@ -63,6 +63,8 @@ class PPMIDownloader:
             "PPMI_PD_Variants_Genetic_Status_WGS_20180921.csv": 1707,
             "Neurological_Exam.csv": 2639,
             "Primary_Clinical_Diagnosis.csv": 2574,
+            "LEDD_Concomitant_Medication_Log.csv" : 2481,
+            "Geriatric_Depression_Scale__Short_Version_.csv": 2480,
         }
         self.config_file = config_file
         self.__set_credentials()
