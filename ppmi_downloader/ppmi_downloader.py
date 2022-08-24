@@ -64,7 +64,9 @@ class PPMIDownloader:
             "Neurological_Exam.csv": 2639,
             "Primary_Clinical_Diagnosis.csv": 2574,
             "Medical_Conditions_Log.csv": 2699,
-            "Prodromal_History.csv": 2697
+            "Prodromal_History.csv": 2697,
+            "LEDD_Concomitant_Medication_Log.csv" : 2481,
+            "Geriatric_Depression_Scale__Short_Version_.csv": 2480,
         }
         self.config_file = config_file
         self.__set_credentials()
