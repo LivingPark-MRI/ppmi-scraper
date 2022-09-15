@@ -380,6 +380,7 @@ class HTMLHelper:
     def login(self, email, password):
         self.driver.get("https://ida.loni.usc.edu/login.jsp?project=PPMI")
         self.click_button("ida-cookie-policy-accept", BY=By.CLASS_NAME)
+        time.sleep(3)
         self.click_button("ida-user-menu-icon", BY=By.CLASS_NAME)
 
         self.enter_data("userEmail", email, BY=By.NAME)
