@@ -258,8 +258,12 @@ class PPMIDownloader:
         self.html.click_button('//*[@id="imgProtocol_checkBox1.Acquisition_Type.3D"]')
         # Click T1 checkbox
         self.html.click_button('//*[@id="imgProtocol_checkBox1.Weighting.T1"]')
-        # Click checkbox to display visit name in resuls
+        # Click checkbox to display visit name in results
         self.html.click_button('//*[@id="RESET_VISIT.0"]')
+        # Click checkbox to display study date in results
+        self.html.click_button('//*[@id="RESET_STUDY.0"]')
+        # Click checkbox to display field strength in results
+        self.html.click_button('//*[@id="RESET_PROTOCOL_NUMERIC.imgProtocol_1_Field_Strength"]')
 
         # Click search button
         self.html.click_button('//*[@id="advSearchQuery"]')
