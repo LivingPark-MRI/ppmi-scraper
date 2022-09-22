@@ -65,7 +65,7 @@ class PPMIDownloader:
             "Primary_Clinical_Diagnosis.csv": 2574,
             "Medical_Conditions_Log.csv": 2699,
             "Prodromal_History.csv": 2697,
-            "LEDD_Concomitant_Medication_Log.csv" : 2481,
+            "LEDD_Concomitant_Medication_Log.csv": 2481,
             "Geriatric_Depression_Scale__Short_Version_.csv": 2480,
             "MDS_UPDRS_Part_II__Patient_Questionnaire.csv": 2490,
             "Modified_Schwab___England_Activities_of_Daily_Living.csv": 2483,
@@ -263,7 +263,9 @@ class PPMIDownloader:
         # Click checkbox to display study date in results
         self.html.click_button('//*[@id="RESET_STUDY.0"]')
         # Click checkbox to display field strength in results
-        self.html.click_button('//*[@id="RESET_PROTOCOL_NUMERIC.imgProtocol_1_Field_Strength"]')
+        self.html.click_button(
+            '//*[@id="RESET_PROTOCOL_NUMERIC.imgProtocol_1_Field_Strength"]'
+        )
 
         # Click search button
         self.html.click_button('//*[@id="advSearchQuery"]')
