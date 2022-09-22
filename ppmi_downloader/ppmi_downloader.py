@@ -67,6 +67,8 @@ class PPMIDownloader:
             "Prodromal_History.csv": 2697,
             "LEDD_Concomitant_Medication_Log.csv" : 2481,
             "Geriatric_Depression_Scale__Short_Version_.csv": 2480,
+            "MDS_UPDRS_Part_II__Patient_Questionnaire.csv": 2490,
+            "Modified_Schwab___England_Activities_of_Daily_Living.csv": 2483,
         }
         self.config_file = config_file
         self.__set_credentials()
