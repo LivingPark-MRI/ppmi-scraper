@@ -69,6 +69,8 @@ class PPMIDownloader:
             "Geriatric_Depression_Scale__Short_Version_.csv": 2480,
             "MDS_UPDRS_Part_II__Patient_Questionnaire.csv": 2490,
             "Modified_Schwab___England_Activities_of_Daily_Living.csv": 2483,
+            "MDS-UPDRS_Part_I.csv": 2488,
+            "MDS-UPDRS_Part_I_Patient_Questionnaire.csv": 2489,
         }
         self.config_file = config_file
         self.__set_credentials()
