@@ -1,10 +1,12 @@
 import os
 from os import path as op
 import getpass
+import json
 import tempfile
 import time
 import shutil
 import zipfile
+
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
@@ -42,36 +44,8 @@ class PPMIDownloader:
         (3) prompting the user.
         """
         # Ids of the download checkboxes in the PPMI metadata download page
-        self.file_ids = {
-            "Demographics.csv": 2544,
-            "Age_at_visit.csv": 2834,
-            "REM_Sleep_Behavior_Disorder_Questionnaire.csv": 2472,
-            "Magnetic_Resonance_Imaging__MRI_.csv": 2655,
-            "MDS_UPDRS_Part_III.csv": 2796,
-            "Socio-Economics.csv": 2576,
-            "Montreal_Cognitive_Assessment__MoCA_.csv": 2712,
-            "Age_of_Parkinson_s_Disease_Diagnosis__Online_.csv": 2853,
-            "PD_Diagnosis_History.csv": 2588,
-            "PPMI_Original_Cohort_BL_to_Year_5_Dataset_Apr2020.csv": 2203,
-            "Participant_Status.csv": 2543,
-            "Inclusion_Exclusion.csv": 2696,
-            "Inclusion_Exclusion-Archived.csv": 34,
-            "Concomitant_Medication_Log.csv": 2701,
-            "MRI_Metadata.csv": 2583,
-            "Cognitive_Categorization.csv": 2708,
-            "iu_genetic_consensus_20220310.csv": 2967,
-            "PPMI_PD_Variants_Genetic_Status_WGS_20180921.csv": 1707,
-            "Neurological_Exam.csv": 2639,
-            "Primary_Clinical_Diagnosis.csv": 2574,
-            "Medical_Conditions_Log.csv": 2699,
-            "Prodromal_History.csv": 2697,
-            "LEDD_Concomitant_Medication_Log.csv": 2481,
-            "Geriatric_Depression_Scale__Short_Version_.csv": 2480,
-            "MDS_UPDRS_Part_II__Patient_Questionnaire.csv": 2490,
-            "Modified_Schwab___England_Activities_of_Daily_Living.csv": 2483,
-            "MDS-UPDRS_Part_I.csv": 2488,
-            "MDS-UPDRS_Part_I_Patient_Questionnaire.csv": 2489,
-        }
+        with open(Path(__file__).parent.joinpath("file_id.json").resolve()) as fin:
+            self.file_ids = json.load(fin)
         self.config_file = config_file
         self.__set_credentials()
 

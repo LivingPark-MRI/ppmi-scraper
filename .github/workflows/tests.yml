@@ -1,0 +1,28 @@
+name: Tests
+
+on:
+  schedule:
+    - cron: "0 0 * * *"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v3
+      - name: Setup Python
+        uses: actions/setup-python@v4.2.0
+
+      - name: Install Python requirements
+        run: | 
+          : \
+          && python -m pip install . \
+          && pip install pytest-rerunfailures \
+          && :
+
+      - name: Run pytest
+        run: pytest -v
+        env:
+          PPMI_USER: ${{ secrets.PPMI_USER }}
+          PPMI_PASSWORD: ${{ secrets.PPMI_PASSWORD }}
