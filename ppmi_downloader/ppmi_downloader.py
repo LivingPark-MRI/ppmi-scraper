@@ -266,6 +266,8 @@ class PPMIDownloader:
         self.html.click_button(
             '//*[@id="RESET_PROTOCOL_NUMERIC.imgProtocol_1_Field_Strength"]'
         )
+        # Click checkbox to display acquisition plane in results
+        self.html.click_button('//*[@id="RESET_PROTOCOL_STRING.1_Acquisition_Plane"]')
 
         # Click search button
         self.html.click_button('//*[@id="advSearchQuery"]')
