@@ -13,4 +13,5 @@ setup(
     packages=['ppmi_downloader'],
     setup_requires=DEPS,
     install_requires=DEPS,
+    include_package_data=True,
 )
