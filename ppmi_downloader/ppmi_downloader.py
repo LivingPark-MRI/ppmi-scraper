@@ -9,7 +9,6 @@ import zipfile
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.wait import WebDriverWait
 from webdriver_manager.chrome import ChromeDriverManager
 from configparser import SafeConfigParser
@@ -310,16 +309,17 @@ class PPMIDownloader:
 
         # navigate to metadata page
         self.driver.get("https://ida.loni.usc.edu/home/projectPage.jsp?project=PPMI")
-        self.html.click_button("//a[text()='Download']")
-        self.html.click_button("//a[text()='Study Data']")
-        self.html.click_button('//*[@id="ygtvlabelel71"]')
+        self.html.click_button("//*[text()='Download']", By.XPATH)
+        self.html.click_button("Study Data", By.LINK_TEXT)
+        self.html.click_button("ygtvlabelel71", By.ID)  # All files
 
         # select file and download
         for file_name in file_ids:
-            xpath = f"//input[@id={self.file_ids[file_name]}]"
-            for checkbox in self.driver.find_elements(By.XPATH, xpath)[0:2]:
+            for checkbox in self.driver.find_elements(By.ID, self.file_ids[file_name])[
+                0:2
+            ]:
                 checkbox.click()
-        self.html.click_button('//*[@id="downloadBtn"]')
+        self.html.click_button("downloadBtn", By.ID)
 
         # Wait for download to complete
         def download_complete(driver):
@@ -371,9 +371,7 @@ class HTMLHelper:
 
         self.enter_data("userEmail", email, BY=By.NAME)
         self.enter_data("userPassword", password, BY=By.NAME)
-        self.click_button(
-            "/html/body/div[1]/div[2]/div/div/div[2]/div[4]/div[2]/div/div[1]/form/div[2]/span"
-        )
+        self.click_button("login-btn", By.CLASS_NAME)
 
     def unzip_metadata(self, tempdir, destination_dir):
         # Move file to cwd or extract zip file
