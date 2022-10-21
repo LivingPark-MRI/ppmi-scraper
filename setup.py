@@ -1,7 +1,7 @@
 from setuptools import setup
 
 
-DEPS = [ 'webdriver_manager', 'selenium']
+DEPS = ['webdriver_manager', 'selenium', 'icecream']
 
 setup(
     name='ppmi_downloader',

@@ -1,21 +1,25 @@
-import os
-from os import path as op
 import getpass
+import glob
 import json
-import tempfile
-import time
+import os
+import os.path as op
 import shutil
-import zipfile
+import string
+import tempfile
+import xml.etree.ElementTree as ET
+from configparser import ConfigParser
+from pathlib import Path
 
+import tqdm
+from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
 from webdriver_manager.chrome import ChromeDriverManager
-from configparser import SafeConfigParser
-import glob
-import xml.etree.ElementTree as ET
-import os.path as op
-from pathlib import Path
+
+import ppmi_downloader.ppmi_logger as logger
+from ppmi_downloader.ppmi_navigator import (PPMINavigator, ppmi_main_webpage,
+                                            ppmin_home_webpage)
 
 
 def get_driver(headless, tempdir):
@@ -64,7 +68,7 @@ class PPMIDownloader:
 
         # look in config file
         if op.exists(self.config_file):
-            config = SafeConfigParser()
+            config = ConfigParser()
             config.read(self.config_file)
             login = config.get("ppmi", "login")
             password = config.get("ppmi", "password")
@@ -82,7 +86,7 @@ class PPMIDownloader:
 
         if not read_config:
             # write config file
-            config = SafeConfigParser()
+            config = ConfigParser()
             config.read(self.config_file)
             config.add_section("ppmi")
             config.set("ppmi", "login", login)
@@ -92,6 +96,67 @@ class PPMIDownloader:
 
         self.email = login
         self.password = password
+
+    def init_and_log(self, headless=True):
+        '''
+        Initialize a driver, a ppmi navigator
+        and login to ppmi portal
+        '''
+        tempdir = tempfile.TemporaryDirectory(dir=os.getcwd())
+        self.driver = get_driver(headless, tempdir.name)
+        self.driver.get(ppmi_main_webpage)
+        self.html = PPMINavigator(self.driver)
+        self.html.login(self.email, self.password)
+
+    def crawl_checkboxes_id(self, soup):
+        label_to_checkboxes_id = {}
+        for checkbox in soup.find_all(type='checkbox'):
+            if (checkbox_id := checkbox.get('id')) is not None:
+                if checkbox.nextSibling is not None:
+                    name = checkbox.nextSibling.text
+                    if name == '' or name is None:
+                        logger.warning(
+                            f'Found checkbox with no name: {checkbox}')
+                    else:
+                        label_to_checkboxes_id[name.strip()] = checkbox_id
+        return label_to_checkboxes_id
+
+    def crawl_study_data(self,
+                         cache_file='study_data_to_checkbox_id.csv',
+                         headless=True):
+        '''
+        Creates a mapping between Study data checkbox's name 
+        and their corresponding checkbox id
+        '''
+        self.init_and_log(headless=headless)
+        self.html.click_button_chain(['Download', 'Study Data'])
+        soup = BeautifulSoup(self.driver.page_source)
+        study_name_to_checkbox = self.crawl_checkboxes_id(soup)
+
+        def clean_name(name):
+            allow = string.ascii_letters + string.digits
+            cleaned = [''.join([c for c in token if c in allow])
+                       for token in name.split()]
+            return '_'.join(cleaned)
+
+        study_name_to_checkbox_clean = {}
+        for name, checkbox in study_name_to_checkbox.items():
+            study_name_to_checkbox[clean_name(name)] = checkbox
+
+        with open(cache_file, 'w', encoding='utf-8') as fo:
+            json.dump(study_name_to_checkbox_clean, fo)
+
+    def crawl_advanced_search(self, cache_file='search_to_checkbox_id.csv', headless=True):
+        '''
+        Creates a mapping between Advances Search checkboxe's name 
+        and their corresponding checkbox id
+        '''
+        self.init_and_log(headless=headless)
+        self.html.click_button_chain(['Search', 'Advanced Search (beta)'])
+        soup = BeautifulSoup(self.driver.page_source)
+        criteria_name_to_checkbox_id = self.crawl_checkboxes_id(soup)
+        with open(cache_file, 'w', encoding='utf-8') as fo:
+            json.dump(criteria_name_to_checkbox_id, fo)
 
     def download_imaging_data(
         self,
@@ -129,42 +194,35 @@ class PPMIDownloader:
         self.driver = get_driver(headless, tempdir)
 
         # Login to PPMI
-        self.driver.get("https://ida.loni.usc.edu/login.jsp?project=PPMI")
-        self.html = HTMLHelper(self.driver)
+        self.driver.get(ppmi_main_webpage)
+        self.html = PPMINavigator(self.driver)
         self.html.login(self.email, self.password)
 
         # navigate to search page
-        self.driver.get("https://ida.loni.usc.edu/home/projectPage.jsp?project=PPMI")
-        self.html.click_button("//a[text()='SEARCH']")
-        self.html.click_button("//a[text()='Advanced Image Search (beta)']")
-        time.sleep(2)
+        self.driver.get(ppmin_home_webpage)
+        # click on 'Search'
+        # Click on 'Advanced Image Search (beta)'
+        self.html.click_button_chain(
+            ['Search', 'Advanced Image Search (beta)'])
 
         # Enter id's and add to collection
-        self.html.enter_data('//*[@id="subjectIdText"]', subjectIds)
-        time.sleep(2)
-        self.html.click_button('//*[@id="advSearchQuery"]')
-        time.sleep(2)
-        self.html.click_button('//*[@id="advResultSelectAll"]')
-        time.sleep(3)
-        self.html.click_button('//*[@id="advResultAddCollectId"]')
-        time.sleep(2)
-        self.html.enter_data('//*[@id="nameText"]', f"images-{op.basename(tempdir)}")
-        time.sleep(3)
+        self.html.enter_data('subjectIdText', subjectIds, By.ID)
+        self.html.click_button("advSearchQuery", By.ID)
+        self.html.click_button("advResultSelectAll", By.ID)
+        self.html.click_button("advResultAddCollectId", By.ID)
+        self.html.enter_data("nameText",
+                             f"images-{op.basename(tempdir)}", By.ID)
         self.html.click_button('//*[text()="OK"]')
-        time.sleep(2)
-        self.html.click_button('//*[@id="export"]')
-        time.sleep(2)
-        self.html.click_button('//*[@id="selectAllCheckBox"]')
-        time.sleep(2)
+        self.html.click_button("export", By.ID)
+        self.html.click_button("selectAllCheckBox", By.ID)
         if type == "nifti":
-            self.html.click_button('//*[@id="niftiButton"]')
+            self.html.click_button("niftiButton", By.ID)
         elif type == "archived":
-            self.html.click_button('//*[@id="archivedButton"]')
-        self.html.click_button('//*[@id="simple-download-button"]')
+            self.html.click_button("archivedButton", By.ID)
+        self.html.click_button("simple-download-button", By.ID)
 
         # Download imaging data and metadata
-        self.html.click_button('//*[@id="simple-download-link"]')
-        time.sleep(2)
+        self.html.click_button("simple-download-link", By.ID)
         self.html.click_button(
             (
                 '//*[@class="simple-download-metadata-link-text singlefile-download-metadata-link"]'
@@ -180,12 +238,7 @@ class PPMIDownloader:
             for f in downloaded_files:
                 if f.endswith(".crdownload"):
                     return False
-            assert (
-                f.endswith(".csv")
-                or f.endswith(".zip")
-                or f.endswith(".dcm")
-                or f.endswith(".xml")
-            ), f
+            assert f.endswith(('.csv', '.zip', '.dcm', '.xml')), f
             return True
 
         WebDriverWait(self.driver, timeout).until(download_complete)
@@ -197,7 +250,8 @@ class PPMIDownloader:
         assert len(downloaded_files) == 3
 
         # unzip files
-        self.html.unzip_imaging_data(downloaded_files, tempdir, destination_dir)
+        self.html.unzip_imaging_data(
+            downloaded_files, tempdir, destination_dir)
 
         # Remove tempdir
         shutil.rmtree(tempdir, ignore_errors=True)
@@ -216,21 +270,20 @@ class PPMIDownloader:
         self.driver = get_driver(headless, tempdir)
 
         # Login to PPMI
-        self.driver.get("https://ida.loni.usc.edu/login.jsp?project=PPMI")
-        self.html = HTMLHelper(self.driver)
+        self.driver.get(ppmi_main_webpage)
+        self.html = PPMINavigator(self.driver)
         self.html.login(self.email, self.password)
-        print("after login")
 
         # navigate to metadata page
-        self.driver.get("https://ida.loni.usc.edu/home/projectPage.jsp?project=PPMI")
-        self.html.click_button("//a[text()='Download']")
-        self.html.click_button("//a[text()='Image Collections']")
-        # Click Advanced Search button
-        self.html.click_button(
-            "/html/body/div[3]/table/tbody/tr[2]/td/div/ul/li[2]/a/em/font"
-        )
+        self.driver.get(ppmin_home_webpage)
+        actions_chain = ['Download',
+                         'Image Collections',
+                         'Advanced Search (beta)']
+        self.html.action_chain(actions_chain)
+
         # Click 3D checkbox
-        self.html.click_button('//*[@id="imgProtocol_checkBox1.Acquisition_Type.3D"]')
+        self.html.click_button(
+            '//*[@id="imgProtocol_checkBox1.Acquisition_Type.3D"]')
         # Click T1 checkbox
         self.html.click_button('//*[@id="imgProtocol_checkBox1.Weighting.T1"]')
         # Click checkbox to display visit name in results
@@ -242,14 +295,13 @@ class PPMIDownloader:
             '//*[@id="RESET_PROTOCOL_NUMERIC.imgProtocol_1_Field_Strength"]'
         )
         # Click checkbox to display acquisition plane in results
-        self.html.click_button('//*[@id="RESET_PROTOCOL_STRING.1_Acquisition_Plane"]')
+        self.html.click_button(
+            '//*[@id="RESET_PROTOCOL_STRING.1_Acquisition_Plane"]')
 
         # Click search button
         self.html.click_button('//*[@id="advSearchQuery"]')
         # Click CSV Download button
-        self.html.click_button(
-            "/html/body/div[2]/table/tbody/tr[2]/td/div/div/div[3]/form/table/tbody/tr/td[2]/table[1]/tbody/tr/td/table/tbody/tr/td[3]/table/tbody/tr/td[5]/input"
-        )
+        self.html.click_button('//*[@type="button" and @value="CSV Download"]')
 
         # Wait for download to complete
         def download_complete(driver):
@@ -277,21 +329,21 @@ class PPMIDownloader:
         self, file_ids, headless=True, timeout=120, destination_dir="."
     ):
         """
-        Download metadata files from PPMI. Requires Google Chrome.
+          Download metadata files from PPMI. Requires Google Chrome.
 
-        Positional arguments
-        * file_ids: list of file ids included in self.file_ids.keys
+          Positional arguments
+          * file_ids: list of file ids included in self.file_ids.keys
 
-        Keyword arguments:
-        * headless: if False, run Chrome not headless
-        * timeout: file download timeout, in seconds
-        * destination_dir: directory where to store the downloaded files
-        """
+          Keyword arguments:
+          * headless: if False, run Chrome not headless
+          * timeout: file download timeout, in seconds
+          * destination_dir: directory where to store the downloaded files
+          """
 
         if not type(file_ids) is list:
             file_ids = [file_ids]
 
-        for file_name in file_ids:
+        for file_name in tqdm.tqdm(file_ids):
             if file_name not in self.file_ids:
                 raise Exception(
                     f"Unsupported file name: {file_name}."
@@ -300,18 +352,17 @@ class PPMIDownloader:
 
         # Create Chrome webdriver
         tempdir = op.abspath(tempfile.mkdtemp(dir="."))
+
         self.driver = get_driver(headless, tempdir)
 
         # Login to PPMI
-        self.driver.get("https://ida.loni.usc.edu/login.jsp?project=PPMI")
-        self.html = HTMLHelper(self.driver)
+        self.driver.get(ppmi_main_webpage)
+        self.html = PPMINavigator(self.driver)
         self.html.login(self.email, self.password)
 
         # navigate to metadata page
-        self.driver.get("https://ida.loni.usc.edu/home/projectPage.jsp?project=PPMI")
-        self.html.click_button("//*[text()='Download']", By.XPATH)
-        self.html.click_button("Study Data", By.LINK_TEXT)
-        self.html.click_button("ygtvlabelel71", By.ID)  # All files
+        self.driver.get(ppmin_home_webpage)
+        self.html.action_chain(['Download', 'Study Data', 'ALL'])
 
         # select file and download
         for file_name in file_ids:
@@ -330,7 +381,8 @@ class PPMIDownloader:
             f = downloaded_files[0]
             if f.endswith(".crdownload"):
                 return False
-            assert f.endswith(".csv") or f.endswith(".zip"), f"file ends with: {f}"
+            assert f.endswith(".csv") or f.endswith(
+                ".zip"), f"file ends with: {f}"
             return True
 
         WebDriverWait(self.driver, timeout).until(download_complete)
@@ -340,76 +392,6 @@ class PPMIDownloader:
 
         # Remove tempdir
         shutil.rmtree(tempdir, ignore_errors=True)
-
-
-class HTMLHelper:
-    def __init__(self, driver) -> None:
-        self.driver = driver
-
-    def enter_data(self, field, data, BY=By.XPATH):
-        try:
-            self.driver.find_element(BY, field).send_keys(data)
-            pass
-        except Exception as e:
-            print(e)
-            time.sleep(1)
-            self.enter_data(field, data, BY=BY)
-
-    def click_button(self, field, BY=By.XPATH):
-        try:
-            self.driver.find_element(BY, field).click()
-            pass
-        except Exception:
-            time.sleep(1)
-            self.click_button(field, BY=BY)
-
-    def login(self, email, password):
-        self.driver.get("https://ida.loni.usc.edu/login.jsp?project=PPMI")
-        self.click_button("ida-cookie-policy-accept", BY=By.CLASS_NAME)
-        time.sleep(3)
-        self.click_button("ida-user-menu-icon", BY=By.CLASS_NAME)
-
-        self.enter_data("userEmail", email, BY=By.NAME)
-        self.enter_data("userPassword", password, BY=By.NAME)
-        self.click_button("login-btn", By.CLASS_NAME)
-
-    def unzip_metadata(self, tempdir, destination_dir):
-        # Move file to cwd or extract zip file
-        downloaded_files = os.listdir(tempdir)
-        # we got either a csv or a zip file
-        assert len(downloaded_files) == 1
-        file_name = downloaded_files[0]
-        assert file_name.endswith(".zip") or file_name.endswith(".csv")
-
-        if file_name.endswith(".zip"):
-            # unzip file to cwd
-            with zipfile.ZipFile(op.join(tempdir, file_name), "r") as zip_ref:
-                zip_ref.extractall(destination_dir)
-                print(f"Successfully downloaded files {zip_ref.namelist()[:2]}...")
-        else:
-            os.rename(op.join(tempdir, file_name), op.join(destination_dir, file_name))
-            print(f"Successfully downloaded file {file_name}")
-        return file_name
-
-    def unzip_imaging_data(self, downloaded_files, tempdir, destination_dir):
-        for file_name in downloaded_files:
-            assert (
-                file_name.endswith(".zip")
-                or file_name.endswith(".csv")
-                or file_name.endswith(".dcm")
-                or file_name.endswith(".xml")
-            ), file_name
-            if file_name.endswith(".zip"):
-                # unzip file to cwd
-                with zipfile.ZipFile(op.join(tempdir, file_name), "r") as zip_ref:
-                    zip_ref.extractall(destination_dir)
-                    print(f"Successfully downloaded files {zip_ref.namelist()[:2]}...")
-            else:
-                os.rename(
-                    op.join(tempdir, file_name), op.join(destination_dir, file_name)
-                )
-                print(f"Successfully downloaded file {file_name}")
-        return downloaded_files
 
 
 class PPMINiftiFileFinder:
@@ -496,7 +478,8 @@ class PPMINiftiFileFinder:
                 if child.tag == "visit":
                     visit_id = parse_visit(child)
                 if child.tag == "study":
-                    study_id, series_id, image_id, description = parse_study(child)
+                    study_id, series_id, image_id, description = parse_study(
+                        child)
             assert not None in (
                 subject_id,
                 visit_id,
