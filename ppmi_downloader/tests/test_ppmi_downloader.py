@@ -73,12 +73,12 @@ def test_download_imaging_data():
 
 
 def test_crawl_study_data():
-    cache_file = 'study_data_to_checkbox_id.csv'
+    cache_file = 'study_data_to_checkbox_id.json'
     ppmi.crawl_study_data(cache_file=cache_file, headless=False)
     assert os.path.exists(cache_file)
 
 
 def test_crawl_advanced_search():
-    cache_file = 'search_to_checkbox_id.csv'
+    cache_file = 'search_to_checkbox_id.json'
     ppmi.crawl_advanced_search(cache_file=cache_file, headless=False)
     assert os.path.exists(cache_file)
