@@ -1,11 +1,10 @@
-from functools import cache
 import os
 import tempfile
-from tempfile import tempdir
 import livingpark_utils
 import json
 from pathlib import Path
 import random
+from configparser import ConfigParser
 
 import pytest
 
@@ -25,24 +24,41 @@ def test_download_metadata():
 
 def test_download_ppmi_metadata():
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        utils = livingpark_utils.LivingParkUtils(tmpdir)
+    tmpdir = tempfile.TemporaryDirectory()
+    utils = livingpark_utils.LivingParkUtils(tmpdir)
 
-        required_files = [
-            "Demographics.csv",
-            "REM_Sleep_Behavior_Disorder_Questionnaire.csv",
-            "Primary_Clinical_Diagnosis.csv",
-            "Cognitive_Categorization.csv",
-            "Medical_Conditions_Log.csv",
-            "Concomitant_Medication_Log.csv",
-            "Prodromal_History.csv",
-        ]
+    required_files = [
+        "Demographics.csv",
+        "REM_Sleep_Behavior_Disorder_Questionnaire.csv",
+        "Primary_Clinical_Diagnosis.csv",
+        "Cognitive_Categorization.csv",
+        "Medical_Conditions_Log.csv",
+        "Concomitant_Medication_Log.csv",
+        "Prodromal_History.csv",
+    ]
 
-        utils.download_ppmi_metadata(required_files, headless=False)
+    utils.download_ppmi_metadata(required_files, headless=False)
 
 
-def test_ppmi_login():
-    ppmi.init_and_log(headless=True)
+def test_ppmi_failing_login():
+    config_filename = tempfile.NamedTemporaryFile()
+    config_parser = ConfigParser()
+    config_parser['ppmi'] = {
+        'login': 'fake@fake.com',
+        'password': 'fake'
+    }
+    with open(config_filename.name, 'w', encoding='utf-8') as fo:
+        config_parser.write(fo)
+        fo.flush()
+    ppmi_wrong = PPMIDownloader(config_file=config_filename.name)
+    with pytest.raises(SystemExit):
+        ppmi_wrong.init_and_log(headless=False)
+
+
+def test_ppmi_successing_login():
+    # Requires PPMI_LOGIN and PPMI_PASSWORD
+    # environment variables to be set
+    ppmi.init_and_log()
 
 
 @pytest.mark.flaky(reruns=3, reruns_delay=5)
@@ -58,7 +74,7 @@ def test_download_imaging_data():
 
 def test_crawl_study_data():
     cache_file = 'study_data_to_checkbox_id.csv'
-    ppmi.crawl_study_data(cache_file=cache_file)
+    ppmi.crawl_study_data(cache_file=cache_file, headless=False)
     assert os.path.exists(cache_file)
 
 
