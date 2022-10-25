@@ -1,13 +1,17 @@
+from typing import Dict
+from typing import List
 import time
 import os
 import os.path as op
 import zipfile
+import urllib.parse
 
 import selenium.webdriver.support.expected_conditions as EC
 import tqdm
 from selenium.common.exceptions import (ElementClickInterceptedException,
                                         NoSuchElementException,
-                                        WebDriverException)
+                                        WebDriverException,
+                                        TimeoutException)
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
 
@@ -30,8 +34,6 @@ class HTMLHelper:
         return element
 
     def enter_data(self, field, data,
-                   pre=None,
-                   post=None,
                    BY=By.XPATH,
                    debug_name=''):
         try:
@@ -127,38 +129,43 @@ class HTMLHelper:
 
 class PPMINavigator(HTMLHelper):
 
-    def click_chain_cleaner(self, action):
+    def click_chain_cleaner(self, action: str) -> str:
         '''
-        Clean action name to match function        
+        Clean action name to match function
         '''
         return action.replace('(', '').replace(')', '').replace(' ', '')
 
-    def click_button_chain(self, chain):
+    def click_button_chain(self, chain: List[str]) -> None:
         '''
         Allows for chaining multiple actions represented as a list of string
         For example:
             ["Download","Study Data","ALL"]
-        will click on Download then Study Data and finally ALL        
+        will click on Download then Study Data and finally ALL
         '''
-        if isinstance(chain, list):
-            actions = chain
-        else:
-            raise Exception(f'Unknown type {type(action)} for action chain')
-
         action = []
-        for action_name in actions:
+        for action_name in chain:
             action.append(self.click_chain_cleaner(action_name))
             getattr(self, '_'.join(action))()
 
-    def Download(self):
-        def postcondition():
+    def check_url_query(self, url: str, queries: Dict[str, str]) -> bool:
+        query = urllib.parse.parse_qs(url)
+        logger.debug(queries)
+        for field, expected in queries.items():
+            actual = query.get(field, ['']).pop()
+            logger.debug(field, expected, actual, expected == actual)
+            if actual != expected:
+                return False
+        return True
+
+    def Download(self) -> None:
+        def postcondition() -> bool:
             try:
                 name = 'ida-menu-option.sub-menu.download.active'
                 predicate = EC.presence_of_element_located(
                     (By.CLASS_NAME, name))
-                WebDriverWait(self.driver, TIMEOUT,
+                WebDriverWait(self.driver, 2,
                               poll_frequency=1).until(predicate)
-            except NoSuchElementException:
+            except (NoSuchElementException, TimeoutException):
                 return False
             else:
                 return True
@@ -167,7 +174,7 @@ class PPMINavigator(HTMLHelper):
                               BY=By.CLASS_NAME,
                               debug_name='Download')
 
-    def Download_StudyData(self):
+    def Download_StudyData(self) -> None:
         '''
         Parent: Download
         '''
@@ -176,7 +183,7 @@ class PPMINavigator(HTMLHelper):
             self.click_button_by_text('Study Data',
                                       debug_name='Study Data')
 
-    def Download_StudyData_ALL(self):
+    def Download_StudyData_ALL(self) -> None:
         '''
         Parent: StudyData
         '''
@@ -184,41 +191,90 @@ class PPMINavigator(HTMLHelper):
         while self.driver.current_url != studydata_url:
             self.click_button("ygtvlabelel71", BY=By.ID, debug_name='ALL')
 
-    def Download_ImageCollections(self):
+    def Download_ImageCollections(self) -> None:
         '''
         Parent: Download
         '''
-        self.click_button_by_text(
-            "Image Collections", debug_name='Image Collections')
+        def postcondition() -> bool:
+            time.sleep(1)
+            return self.check_url_query(self.driver.current_url,
+                                        {'page': 'DOWNLOADS',
+                                         'subPage': 'IMAGE_COLLECTIONS'})
 
-    def Download_GeneticData(self):
+        while not postcondition():
+            self.click_button_by_text(
+                "Image Collections", debug_name='Image Collections')
+
+    def Download_GeneticData(self) -> None:
         '''
         Parent: Download
         '''
-        self.click_button_by_text("Genetic Data", debug_name='Generic Data')
+        def postcondition() -> bool:
+            time.sleep(1)
+            return self.check_url_query(self.driver.current_url,
+                                        {'page': 'DOWNLOADS',
+                                         'subPage': 'GENETIC_DATA'})
 
-    def Search(self):
-        self.click_button('ida-menu-option.sub-menu.search',
-                          BY=By.CLASS_NAME,
-                          debug_name='Search')
+        while not postcondition():
+            self.click_button_by_text("Genetic Data",
+                                      debug_name='Generic Data')
 
-    def Search_SimpleImageSearch(self):
+    def Search(self) -> None:
+        def postcondition() -> bool:
+            try:
+                name = 'ida-menu-option.sub-menu.search.active'
+                predicate = EC.presence_of_element_located(
+                    (By.CLASS_NAME, name))
+                WebDriverWait(self.driver, 2,
+                              poll_frequency=1).until(predicate)
+            except (NoSuchElementException, TimeoutException):
+                return False
+            else:
+                return True
+        while not postcondition():
+            self.click_button('ida-menu-option.sub-menu.search',
+                              BY=By.CLASS_NAME,
+                              debug_name='Search')
+
+    def Search_SimpleImageSearch(self) -> None:
         '''
         Parent: Search
         '''
-        self.click_button_by_text('Simple Image Search',
-                                  debug_name='Simple Image Search')
+        def postcondition() -> bool:
+            time.sleep(1)
+            return self.check_url_query(self.driver.current_url,
+                                        {'page': 'SEARCH',
+                                         'subPage': 'SIMPLE_QUERY'})
 
-    def Search_AdvancedImageSearch(self):
+        while not postcondition():
+            self.click_button_by_text('Simple Image Search',
+                                      debug_name='Simple Image Search')
+
+    def Search_AdvancedImageSearch(self) -> None:
         '''
         Parent: Search
         '''
-        self.click_button_by_text("Advanced Image Search",
-                                  debug_name='Advanced Image Search')
+        def postcondition() -> bool:
+            time.sleep(1)
+            return self.check_url_query(self.driver.current_url,
+                                        {'page': 'SEARCH',
+                                         'subPage': 'ADV_QUERY'})
 
-    def Search_AdvancedImageSearchbeta(self):
+        while not postcondition():
+            self.click_button_by_text("Advanced Image Search",
+                                      debug_name='Advanced Image Search')
+
+    def Search_AdvancedImageSearchbeta(self) -> None:
         '''
         Parent: Search
         '''
-        self.click_button_by_text("Advanced Image Search (beta)",
-                                  debug_name="Advanced Image Search (beta)")
+        def postcondition() -> bool:
+            time.sleep(1)
+            return self.check_url_query(self.driver.current_url,
+                                        {'page': 'SEARCH',
+                                         'subPage': 'NEW_ADV_QUERY'})
+
+        while not postcondition():
+            logger.debug(not postcondition())
+            self.click_button_by_text("Advanced Image Search (beta)",
+                                      debug_name="Advanced Image Search (beta)")

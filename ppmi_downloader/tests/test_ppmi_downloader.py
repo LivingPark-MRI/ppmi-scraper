@@ -80,5 +80,5 @@ def test_crawl_study_data():
 
 def test_crawl_advanced_search():
     cache_file = 'search_to_checkbox_id.csv'
-    ppmi.crawl_advanced_search(cache_file=cache_file)
+    ppmi.crawl_advanced_search(cache_file=cache_file, headless=False)
     assert os.path.exists(cache_file)

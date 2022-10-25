@@ -18,7 +18,8 @@ from selenium.webdriver.support.wait import WebDriverWait
 from webdriver_manager.chrome import ChromeDriverManager
 
 import ppmi_downloader.ppmi_logger as logger
-from ppmi_downloader.ppmi_navigator import (PPMINavigator, ppmi_main_webpage,
+from ppmi_downloader.ppmi_navigator import (PPMINavigator,
+                                            ppmi_main_webpage,
                                             ppmi_home_webpage,
                                             ppmi_login_webpage)
 
@@ -55,6 +56,10 @@ class PPMIDownloader:
         self.config_file = config_file
         self.__set_credentials()
         logger.debug(self.config_file, config_file)
+
+    def __del__(self):
+        if hasattr(self, "driver"):
+            self.driver.close()
 
     def __set_credentials(self):
         """
@@ -116,11 +121,11 @@ class PPMIDownloader:
         label_to_checkboxes_id = {}
         for checkbox in soup.find_all(type='checkbox'):
             if (checkbox_id := checkbox.get('id')) is not None:
-                if checkbox.nextSibling is not None:
-                    name = checkbox.nextSibling.text
+                if (href := checkbox.findNext()) is not None:
+                    name = href.text
                     if name == '' or name is None:
                         logger.warning(
-                            f'Found checkbox with no name: {checkbox}')
+                            f'Found checkbox with no name {checkbox}')
                     else:
                         label_to_checkboxes_id[name.strip()] = checkbox_id
         return label_to_checkboxes_id
@@ -141,26 +146,29 @@ class PPMIDownloader:
             allow = string.ascii_letters + string.digits
             cleaned = [''.join([c for c in token if c in allow])
                        for token in name.split()]
-            return '_'.join(cleaned)
+            return '_'.join(cleaned) + '.csv'
 
         study_name_to_checkbox_clean = {}
         for name, checkbox in study_name_to_checkbox.items():
             study_name_to_checkbox_clean[clean_name(name)] = checkbox
 
         with open(cache_file, 'w', encoding='utf-8') as fo:
-            json.dump(study_name_to_checkbox_clean, fo)
+            json.dump(study_name_to_checkbox_clean, fo, indent=0)
 
-    def crawl_advanced_search(self, cache_file='search_to_checkbox_id.csv', headless=True):
+    def crawl_advanced_search(self,
+                              cache_file='search_to_checkbox_id.csv',
+                              headless=True):
         '''
         Creates a mapping between Advances Search checkboxe's name 
         and their corresponding checkbox id
         '''
         self.init_and_log(headless=headless)
-        self.html.click_button_chain(['Search', 'Advanced Search (beta)'])
-        soup = BeautifulSoup(self.driver.page_source)
+        self.html.click_button_chain(['Search',
+                                      'Advanced Image Search (beta)'])
+        soup = BeautifulSoup(self.driver.page_source, features='lxml')
         criteria_name_to_checkbox_id = self.crawl_checkboxes_id(soup)
         with open(cache_file, 'w', encoding='utf-8') as fo:
-            json.dump(criteria_name_to_checkbox_id, fo)
+            json.dump(criteria_name_to_checkbox_id, fo, indent=0)
 
     def download_imaging_data(
         self,
