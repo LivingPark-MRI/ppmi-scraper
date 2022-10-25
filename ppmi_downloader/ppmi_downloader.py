@@ -20,8 +20,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 import ppmi_downloader.ppmi_logger as logger
 from ppmi_downloader.ppmi_navigator import (PPMINavigator,
                                             ppmi_main_webpage,
-                                            ppmi_home_webpage,
-                                            ppmi_login_webpage)
+                                            ppmi_home_webpage)
 
 
 def get_driver(headless, tempdir):
@@ -43,6 +42,8 @@ class PPMIDownloader:
     See function download_metadata for usage.
     """
 
+    file_ids_default_path = 'file_id.json'
+
     def __init__(self, config_file=".ppmi_config"):
         """
         Initializes PPMI downloader. Set PPMI credentials by (1) looking in
@@ -51,9 +52,15 @@ class PPMIDownloader:
         (3) prompting the user.
         """
         # Ids of the download checkboxes in the PPMI metadata download page
-        with open(Path(__file__).parent.joinpath("file_id.json").resolve()) as fin:
+        file_ids_path = Path(__file__).parent.joinpath(
+            self.file_ids_default_path)
+        if not file_ids_path.exists():
+            self.crawl_study_data(cache_file=file_ids_path)
+
+        with open(file_ids_path, 'r', encoding='utf-8') as fin:
             self.file_ids = json.load(fin)
         self.config_file = config_file
+
         self.__set_credentials()
         logger.debug(self.config_file, config_file)
 
@@ -131,7 +138,7 @@ class PPMIDownloader:
         return label_to_checkboxes_id
 
     def crawl_study_data(self,
-                         cache_file='study_data_to_checkbox_id.csv',
+                         cache_file='study_data_to_checkbox_id.json',
                          headless=True):
         '''
         Creates a mapping between Study data checkbox's name 
@@ -155,8 +162,10 @@ class PPMIDownloader:
         with open(cache_file, 'w', encoding='utf-8') as fo:
             json.dump(study_name_to_checkbox_clean, fo, indent=0)
 
+        self.driver.close()
+
     def crawl_advanced_search(self,
-                              cache_file='search_to_checkbox_id.csv',
+                              cache_file='search_to_checkbox_id.json',
                               headless=True):
         '''
         Creates a mapping between Advances Search checkboxe's name 
@@ -169,6 +178,8 @@ class PPMIDownloader:
         criteria_name_to_checkbox_id = self.crawl_checkboxes_id(soup)
         with open(cache_file, 'w', encoding='utf-8') as fo:
             json.dump(criteria_name_to_checkbox_id, fo, indent=0)
+
+        self.driver.close()
 
     def download_imaging_data(
         self,
@@ -224,7 +235,7 @@ class PPMIDownloader:
         self.html.click_button("advResultAddCollectId", By.ID)
         self.html.enter_data("nameText",
                              f"images-{op.basename(tempdir)}", By.ID)
-        self.html.click_button('//*[text()="OK"]')
+        self.html.click_button_by_text('OK', debug_name='OK')
         self.html.click_button("export", By.ID)
         self.html.click_button("selectAllCheckBox", By.ID)
         if type == "nifti":
@@ -291,27 +302,26 @@ class PPMIDownloader:
         actions_chain = ['Download',
                          'Image Collections',
                          'Advanced Search (beta)']
-        self.html.action_chain(actions_chain)
+        self.html.click_button_chain(actions_chain)
 
         # Click 3D checkbox
         self.html.click_button(
-            '//*[@id="imgProtocol_checkBox1.Acquisition_Type.3D"]')
+            "imgProtocol_checkBox1.Acquisition_Type.3D", By.ID)
         # Click T1 checkbox
-        self.html.click_button('//*[@id="imgProtocol_checkBox1.Weighting.T1"]')
+        self.html.click_button("imgProtocol_checkBox1.Weighting.T1", By.ID)
         # Click checkbox to display visit name in results
-        self.html.click_button('//*[@id="RESET_VISIT.0"]')
+        self.html.click_button("RESET_VISIT.0", By.ID)
         # Click checkbox to display study date in results
-        self.html.click_button('//*[@id="RESET_STUDY.0"]')
+        self.html.click_button("RESET_STUDY.0", By.ID)
         # Click checkbox to display field strength in results
         self.html.click_button(
-            '//*[@id="RESET_PROTOCOL_NUMERIC.imgProtocol_1_Field_Strength"]'
-        )
+            "RESET_PROTOCOL_NUMERIC.imgProtocol_1_Field_Strength", By.ID)
         # Click checkbox to display acquisition plane in results
-        self.html.click_button(
-            '//*[@id="RESET_PROTOCOL_STRING.1_Acquisition_Plane"]')
+        self.html.click_button("RESET_PROTOCOL_STRING.1_Acquisition_Plane",
+                               By.ID)
 
         # Click search button
-        self.html.click_button('//*[@id="advSearchQuery"]')
+        self.html.click_button("advSearchQuery", By.ID)
         # Click CSV Download button
         self.html.click_button('//*[@type="button" and @value="CSV Download"]')
 
@@ -374,7 +384,7 @@ class PPMIDownloader:
 
         # navigate to metadata page
         self.driver.get(ppmi_home_webpage)
-        self.html.action_chain(['Download', 'Study Data', 'ALL'])
+        self.html.click_button_chain(['Download', 'Study Data', 'ALL'])
 
         # select file and download
         for file_name in file_ids:

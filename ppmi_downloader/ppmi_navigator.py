@@ -61,7 +61,7 @@ class HTMLHelper:
         return WebDriverWait(self.driver, TIMEOUT,
                              poll_frequency=1).until(predicate)
 
-    def click_button_by_text(self, text, debug_name):
+    def click_button_by_text(self, text, debug_name=''):
         self.click_button(f"//*[text()='{text}']", debug_name=debug_name)
 
     def validate_cookie_policy(self):
