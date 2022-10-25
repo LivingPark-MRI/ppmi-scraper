@@ -15,30 +15,30 @@ import ppmi_downloader.ppmi_logger as logger
 
 TIMEOUT = 120
 ppmi_main_webpage = "https://ida.loni.usc.edu/login.jsp?project=PPMI"
-ppmin_home_webpage = "https://ida.loni.usc.edu/home/projectPage.jsp?project=PPMI"
+ppmi_home_webpage = "https://ida.loni.usc.edu/home/projectPage.jsp?project=PPMI"
+ppmi_login_webpage = 'https://ida.loni.usc.edu/explore/jsp/common/login.jsp?project=PPMI'
 
 
 class HTMLHelper:
     def __init__(self, driver) -> None:
         self.driver = driver
 
-    def is_page_loaded(self):
-        return self.driver.execute_script('return window.load') == 'true'
+    def wait_for_element_to_be_visible(self, field, BY=By.XPATH):
+        predicate = EC.visibility_of_element_located((BY, field))
+        element = WebDriverWait(self.driver, TIMEOUT,
+                                poll_frequency=1).until(predicate)
+        return element
 
-    def wait_until_page_is_loaded(self):
-        while not self.is_page_loaded():
-            time.sleep(.1)
-
-    def wait(self):
-        self.driver.implicitly_wait(1)
-
-    def enter_data(self, field, data, BY=By.XPATH, debug_name=''):
+    def enter_data(self, field, data,
+                   pre=None,
+                   post=None,
+                   BY=By.XPATH,
+                   debug_name=''):
         try:
             logger.debug('Enter data', field, debug_name)
             predicate = EC.element_to_be_clickable((BY, field))
             form = WebDriverWait(self.driver, TIMEOUT,
                                  poll_frequency=1).until(predicate)
-            self.wait()
             form.send_keys(data)
         except WebDriverException as e:
             self.driver.quit()
@@ -50,11 +50,14 @@ class HTMLHelper:
             predicate = EC.element_to_be_clickable((BY, field))
             button = WebDriverWait(self.driver, TIMEOUT,
                                    poll_frequency=1).until(predicate)
-            self.wait()
             button.click()
         except WebDriverException as e:
             self.driver.quit()
             logger.error(e)
+
+    def wait_for(self, predicate):
+        return WebDriverWait(self.driver, TIMEOUT,
+                             poll_frequency=1).until(predicate)
 
     def click_button_by_text(self, text, debug_name):
         self.click_button(f"//*[text()='{text}']", debug_name=debug_name)
@@ -75,16 +78,18 @@ class HTMLHelper:
 
     def login(self, email, password):
         self.validate_cookie_policy()
-        self.click_button("ida-menu-option.sub-menu.login",
-                          BY=By.CLASS_NAME, debug_name='Log In')
+        self.driver.get(ppmi_login_webpage)
+        self.wait_for_element_to_be_visible('userEmail', BY=By.NAME)
         self.enter_data("userEmail", email, BY=By.NAME, debug_name='Email')
-        self.enter_data("userPassword", password + 'afd',
+        self.wait_for_element_to_be_visible('userPassword', BY=By.NAME)
+        self.enter_data("userPassword", password,
                         BY=By.NAME, debug_name='Password')
-        self.click_button("login-btn", By.CLASS_NAME, debug_name='Login')
+        self.wait_for_element_to_be_visible('button', BY=By.TAG_NAME)
+        self.click_button("button", By.TAG_NAME, debug_name='Login button')
 
         try:
             self.driver.find_element(
-                By.CLASS_NAME, 'ida-menu-login-invalid')
+                By.CLASS_NAME, 'register-input-error-msg.invalid-login')
             logger.error('Login Failed')
         except NoSuchElementException:
             logger.info('Login Successful')
@@ -146,21 +151,38 @@ class PPMINavigator(HTMLHelper):
             getattr(self, '_'.join(action))()
 
     def Download(self):
-        self.click_button('ida-menu-option.sub-menu.download',
-                          BY=By.CLASS_NAME,
-                          debug_name='Download')
+        def postcondition():
+            try:
+                name = 'ida-menu-option.sub-menu.download.active'
+                predicate = EC.presence_of_element_located(
+                    (By.CLASS_NAME, name))
+                WebDriverWait(self.driver, TIMEOUT,
+                              poll_frequency=1).until(predicate)
+            except NoSuchElementException:
+                return False
+            else:
+                return True
+        while not postcondition():
+            self.click_button('ida-menu-option.sub-menu.download',
+                              BY=By.CLASS_NAME,
+                              debug_name='Download')
 
     def Download_StudyData(self):
         '''
         Parent: Download
         '''
-        self.click_button_by_text('Study Data', debug_name='Study Data')
+        studydata_url = 'https://ida.loni.usc.edu/pages/access/studyData.jsp'
+        while not self.driver.current_url.startswith(studydata_url):
+            self.click_button_by_text('Study Data',
+                                      debug_name='Study Data')
 
     def Download_StudyData_ALL(self):
         '''
         Parent: StudyData
         '''
-        self.click_button("ygtvlabelel71", BY=By.ID, debug_name='ALL')
+        studydata_url = 'https://ida.loni.usc.edu/pages/access/studyData.jsp'
+        while self.driver.current_url != studydata_url:
+            self.click_button("ygtvlabelel71", BY=By.ID, debug_name='ALL')
 
     def Download_ImageCollections(self):
         '''

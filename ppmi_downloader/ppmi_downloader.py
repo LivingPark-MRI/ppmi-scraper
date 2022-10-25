@@ -19,7 +19,8 @@ from webdriver_manager.chrome import ChromeDriverManager
 
 import ppmi_downloader.ppmi_logger as logger
 from ppmi_downloader.ppmi_navigator import (PPMINavigator, ppmi_main_webpage,
-                                            ppmin_home_webpage)
+                                            ppmi_home_webpage,
+                                            ppmi_login_webpage)
 
 
 def get_driver(headless, tempdir):
@@ -29,8 +30,10 @@ def get_driver(headless, tempdir):
     options.add_experimental_option("prefs", prefs)
     if headless:
         options.add_argument("--headless")
-
-    return webdriver.Chrome(ChromeDriverManager().install(), chrome_options=options)
+    driver = webdriver.Chrome(
+        ChromeDriverManager().install(), chrome_options=options)
+    driver.maximize_window()
+    return driver
 
 
 class PPMIDownloader:
@@ -51,6 +54,7 @@ class PPMIDownloader:
             self.file_ids = json.load(fin)
         self.config_file = config_file
         self.__set_credentials()
+        logger.debug(self.config_file, config_file)
 
     def __set_credentials(self):
         """
@@ -65,6 +69,7 @@ class PPMIDownloader:
         password = None
 
         read_config = False  # will set to True if credentials are read from config file
+        logger.debug(self.config_file)
 
         # look in config file
         if op.exists(self.config_file):
@@ -104,7 +109,6 @@ class PPMIDownloader:
         '''
         tempdir = tempfile.TemporaryDirectory(dir=os.getcwd())
         self.driver = get_driver(headless, tempdir.name)
-        self.driver.get(ppmi_main_webpage)
         self.html = PPMINavigator(self.driver)
         self.html.login(self.email, self.password)
 
@@ -129,8 +133,8 @@ class PPMIDownloader:
         and their corresponding checkbox id
         '''
         self.init_and_log(headless=headless)
-        self.html.click_button_chain(['Download', 'Study Data'])
-        soup = BeautifulSoup(self.driver.page_source)
+        self.html.click_button_chain(['Download', 'Study Data', 'ALL'])
+        soup = BeautifulSoup(self.driver.page_source, features='lxml')
         study_name_to_checkbox = self.crawl_checkboxes_id(soup)
 
         def clean_name(name):
@@ -141,7 +145,7 @@ class PPMIDownloader:
 
         study_name_to_checkbox_clean = {}
         for name, checkbox in study_name_to_checkbox.items():
-            study_name_to_checkbox[clean_name(name)] = checkbox
+            study_name_to_checkbox_clean[clean_name(name)] = checkbox
 
         with open(cache_file, 'w', encoding='utf-8') as fo:
             json.dump(study_name_to_checkbox_clean, fo)
@@ -199,7 +203,7 @@ class PPMIDownloader:
         self.html.login(self.email, self.password)
 
         # navigate to search page
-        self.driver.get(ppmin_home_webpage)
+        self.driver.get(ppmi_home_webpage)
         # click on 'Search'
         # Click on 'Advanced Image Search (beta)'
         self.html.click_button_chain(
@@ -275,7 +279,7 @@ class PPMIDownloader:
         self.html.login(self.email, self.password)
 
         # navigate to metadata page
-        self.driver.get(ppmin_home_webpage)
+        self.driver.get(ppmi_home_webpage)
         actions_chain = ['Download',
                          'Image Collections',
                          'Advanced Search (beta)']
@@ -361,7 +365,7 @@ class PPMIDownloader:
         self.html.login(self.email, self.password)
 
         # navigate to metadata page
-        self.driver.get(ppmin_home_webpage)
+        self.driver.get(ppmi_home_webpage)
         self.html.action_chain(['Download', 'Study Data', 'ALL'])
 
         # select file and download
