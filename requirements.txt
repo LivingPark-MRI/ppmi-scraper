@@ -3,3 +3,4 @@ selenium
 icecream
 tqdm
 bs4
+lxml
