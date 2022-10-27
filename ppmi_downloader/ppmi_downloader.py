@@ -57,12 +57,12 @@ class PPMIDownloader:
         self.__set_credentials(config_file)
 
         # Ids of the download checkboxes in the PPMI metadata download page
-        file_ids_path = Path(__file__).parent.joinpath(
+        self.file_ids_path = Path(__file__).parent.joinpath(
             self.file_ids_default_path)
-        if not file_ids_path.exists():
-            self.crawl_study_data(cache_file=file_ids_path)
+        if not self.file_ids_path.exists():
+            self.crawl_study_data(cache_file=self.file_ids_path)
 
-        with open(file_ids_path, 'r', encoding='utf-8') as fin:
+        with open(self.file_ids_path, 'r', encoding='utf-8') as fin:
             self.file_ids = json.load(fin)
 
         logger.debug(self.config_file, config_file)

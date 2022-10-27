@@ -60,7 +60,7 @@ def test_crawl_advanced_search():
 @pytest.mark.flaky(reruns=3, reruns_delay=5)
 def test_download_metadata():
     """Download 3 random files from PPMI."""
-    with open(Path(__file__).parents[1].joinpath("file_id.json").resolve()) as fin:
+    with open(ppmi.file_ids_path, 'r', encoding='utf-8') as fin:
         file_id = json.load(fin)
     filenames = file_id.keys()
     ppmi.download_metadata(random.sample(
