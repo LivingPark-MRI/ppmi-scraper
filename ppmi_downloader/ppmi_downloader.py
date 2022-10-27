@@ -54,6 +54,8 @@ class PPMIDownloader:
         (2) looking in environment variables PPMI_LOGIN and PPMI_PASSWORD,
         (3) prompting the user.
         """
+        self.__set_credentials()
+
         # Ids of the download checkboxes in the PPMI metadata download page
         file_ids_path = Path(__file__).parent.joinpath(
             self.file_ids_default_path)
@@ -64,7 +66,6 @@ class PPMIDownloader:
             self.file_ids = json.load(fin)
         self.config_file = config_file
 
-        self.__set_credentials()
         logger.debug(self.config_file, config_file)
 
     def __del__(self):
