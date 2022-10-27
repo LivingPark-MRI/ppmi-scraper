@@ -1,3 +1,4 @@
+import time
 import getpass
 import glob
 import json
@@ -32,6 +33,8 @@ def get_driver(headless, tempdir):
         options.add_argument("--headless")
     driver = webdriver.Chrome(
         ChromeDriverManager().install(), chrome_options=options)
+
+    driver.set_window_size(1200, 720)
     driver.maximize_window()
     return driver
 
@@ -141,7 +144,7 @@ class PPMIDownloader:
                          cache_file='study_data_to_checkbox_id.json',
                          headless=True):
         '''
-        Creates a mapping between Study data checkbox's name 
+        Creates a mapping between Study data checkbox's name
         and their corresponding checkbox id
         '''
         self.init_and_log(headless=headless)
@@ -168,7 +171,7 @@ class PPMIDownloader:
                               cache_file='search_to_checkbox_id.json',
                               headless=True):
         '''
-        Creates a mapping between Advances Search checkboxe's name 
+        Creates a mapping between Advances Search checkboxe's name
         and their corresponding checkbox id
         '''
         self.init_and_log(headless=headless)
@@ -231,11 +234,14 @@ class PPMIDownloader:
         # Enter id's and add to collection
         self.html.enter_data('subjectIdText', subjectIds, By.ID)
         self.html.click_button("advSearchQuery", By.ID)
-        self.html.click_button("advResultSelectAll", By.ID)
+        self.html.Search_AdvancedImageSearchbeta_SelectAll()
+        # self.html.click_button("advResultSelectAll", By.ID)
         self.html.click_button("advResultAddCollectId", By.ID)
         self.html.enter_data("nameText",
                              f"images-{op.basename(tempdir)}", By.ID)
-        self.html.click_button_by_text('OK', debug_name='OK')
+        self.html.click_button('nameText', By.ID)
+        self.html.Search_AdvancedImageSearchbeta_AddToCollection_OK()
+
         self.html.click_button("export", By.ID)
         self.html.click_button("selectAllCheckBox", By.ID)
         if type == "nifti":
@@ -299,10 +305,8 @@ class PPMIDownloader:
 
         # navigate to metadata page
         self.driver.get(ppmi_home_webpage)
-        actions_chain = ['Download',
-                         'Image Collections',
-                         'Advanced Search (beta)']
-        self.html.click_button_chain(actions_chain)
+        self.html.click_button_chain(
+            ['Search', 'Advanced Image Search (beta)'])
 
         # Click 3D checkbox
         self.html.click_button(
