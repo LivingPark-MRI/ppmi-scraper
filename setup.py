@@ -1,7 +1,8 @@
 from setuptools import setup
 
 
-DEPS = ['webdriver_manager', 'selenium', 'icecream', 'tqdm']
+DEPS = ['webdriver_manager', 'selenium',
+        'icecream', 'tqdm', 'livingpark-utils']
 
 setup(
     name='ppmi_downloader',
