@@ -36,7 +36,7 @@ jobs:
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: Test with pytest
       env:
-        PPMI_LOGIN: ${{ secrets.PPMI_LOGIN }}
+        PPMI_LOGIN: ${{ secrets.PPMI_USER }}
         PPMI_PASSWORD: ${{ secrets.PPMI_PASSWORD }}
       run: |
         pytest
