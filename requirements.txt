@@ -3,3 +3,4 @@ selenium
 icecream
 tqdm
 livingpark-utils
+bs4
