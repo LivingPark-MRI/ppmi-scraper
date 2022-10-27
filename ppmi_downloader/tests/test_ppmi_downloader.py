@@ -10,6 +10,8 @@ import pytest
 
 from ppmi_downloader.ppmi_downloader import PPMIDownloader
 
+headless = True
+
 ppmi = PPMIDownloader()
 
 
@@ -19,13 +21,14 @@ def test_download_metadata():
     with open(Path(__file__).parents[1].joinpath("file_id.json").resolve()) as fin:
         file_id = json.load(fin)
     filenames = file_id.keys()
-    ppmi.download_metadata(random.sample(filenames, min(3, len(filenames))))
+    ppmi.download_metadata(random.sample(
+        filenames, min(3, len(filenames))), headless=headless)
 
 
 def test_download_ppmi_metadata():
 
     tmpdir = tempfile.TemporaryDirectory()
-    utils = livingpark_utils.LivingParkUtils(tmpdir)
+    utils = livingpark_utils.LivingParkUtils(tmpdir.name)
 
     required_files = [
         "Demographics.csv",
@@ -37,7 +40,7 @@ def test_download_ppmi_metadata():
         "Prodromal_History.csv",
     ]
 
-    utils.download_ppmi_metadata(required_files, headless=False)
+    utils.download_ppmi_metadata(required_files, headless=headless)
 
 
 def test_ppmi_failing_login():
@@ -52,7 +55,7 @@ def test_ppmi_failing_login():
         fo.flush()
     ppmi_wrong = PPMIDownloader(config_file=config_filename.name)
     with pytest.raises(SystemExit):
-        ppmi_wrong.init_and_log(headless=False)
+        ppmi_wrong.init_and_log(headless=headless)
 
 
 def test_ppmi_successing_login():
@@ -61,24 +64,35 @@ def test_ppmi_successing_login():
     ppmi.init_and_log()
 
 
+def test_hamburger_menu():
+    '''
+    Test Download is correctly clicked when
+    window is small (displayed hamburger menu)
+    '''
+    ppmi.init_and_log()
+    ppmi.driver.set_window_size(800, 600)
+    ppmi.html.Download()
+
+
 @pytest.mark.flaky(reruns=3, reruns_delay=5)
 def test_download_3D_T1_info():
-    ppmi.download_3D_T1_info()
+    ppmi.download_3D_T1_info(headless=headless)
 
 
 @pytest.mark.flaky(reruns=3, reruns_delay=5)
 def test_download_imaging_data():
-    ppmi.download_imaging_data([3001, 3003, 3011])
-    ppmi.download_imaging_data([3001, 3003, 3011], type="nifti")
+    ppmi.download_imaging_data([3001, 3003, 3011], headless=headless)
+    ppmi.download_imaging_data(
+        [3001, 3003, 3011], type="nifti", headless=headless)
 
 
 def test_crawl_study_data():
     cache_file = 'study_data_to_checkbox_id.json'
-    ppmi.crawl_study_data(cache_file=cache_file, headless=False)
+    ppmi.crawl_study_data(cache_file=cache_file, headless=headless)
     assert os.path.exists(cache_file)
 
 
 def test_crawl_advanced_search():
     cache_file = 'search_to_checkbox_id.json'
-    ppmi.crawl_advanced_search(cache_file=cache_file, headless=False)
+    ppmi.crawl_advanced_search(cache_file=cache_file, headless=headless)
     assert os.path.exists(cache_file)

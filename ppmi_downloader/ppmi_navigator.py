@@ -11,13 +11,15 @@ import tqdm
 from selenium.common.exceptions import (ElementClickInterceptedException,
                                         NoSuchElementException,
                                         WebDriverException,
-                                        TimeoutException)
+                                        TimeoutException,
+                                        StaleElementReferenceException)
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
 
 import ppmi_downloader.ppmi_logger as logger
 
-TIMEOUT = 120
+TIMEOUT = 5
+TRIALS = 5
 ppmi_main_webpage = "https://ida.loni.usc.edu/login.jsp?project=PPMI"
 ppmi_home_webpage = "https://ida.loni.usc.edu/home/projectPage.jsp?project=PPMI"
 ppmi_login_webpage = 'https://ida.loni.usc.edu/explore/jsp/common/login.jsp?project=PPMI'
@@ -35,27 +37,61 @@ class HTMLHelper:
 
     def enter_data(self, field, data,
                    BY=By.XPATH,
-                   debug_name=''):
+                   debug_name='',
+                   trials=TRIALS):
+        if trials < 0:
+            logger.error('Number of trials is exceeded')
+            self.driver.quit()
         try:
             logger.debug('Enter data', field, debug_name)
             predicate = EC.element_to_be_clickable((BY, field))
             form = WebDriverWait(self.driver, TIMEOUT,
                                  poll_frequency=1).until(predicate)
             form.send_keys(data)
-        except WebDriverException as e:
-            self.driver.quit()
-            logger.error(e)
+        except WebDriverException:
+            self.enter_data(field=field, data=data, BY=BY,
+                            debug_name=debug_name,
+                            trials=trials - 1)
 
-    def click_button(self, field, BY=By.XPATH, debug_name=''):
+    def click_button(self, field, BY=By.XPATH, debug_name='', trials=TRIALS):
+        if trials < 0:
+            logger.error('Number of trials is exceeded')
+            self.driver.quit()
         try:
             logger.debug('Click button', field, debug_name)
             predicate = EC.element_to_be_clickable((BY, field))
             button = WebDriverWait(self.driver, TIMEOUT,
                                    poll_frequency=1).until(predicate)
             button.click()
-        except WebDriverException as e:
+        except WebDriverException:
+            self.click_button(field=field, BY=BY,
+                              debug_name=debug_name,
+                              trials=trials - 1)
+
+    # def click_button(self, field, BY=By.XPATH, debug_name='', trials=TRIALS):
+    #     elements = self.driver.find_elements(BY, field)
+    #     if len(elements) > 1:
+    #         logger.warning('Multiple elements found for ', field)
+    #         logger.warning(
+    #             'Try a more restrictive mark to avoid selecting misleading elements')
+
+    #     self._click_button(field=field, BY=By.XPATH,
+    #                        debug_name=debug_name, trials=trials)
+
+    def submit_button(self, field, BY=By.XPATH, debug_name='', trials=TRIALS):
+        if trials < 0:
+            logger.error('Number of trials is exceeded')
             self.driver.quit()
-            logger.error(e)
+        try:
+            logger.debug('Submit button', field, debug_name)
+            predicate = EC.element_to_be_clickable((BY, field))
+            button = WebDriverWait(self.driver, TIMEOUT,
+                                   poll_frequency=1).until(predicate)
+            button.submit()
+        except WebDriverException:
+            self.submit_button(field=field, BY=BY,
+                               debug_name=debug_name,
+                               trials=trials - 1)
 
     def wait_for(self, predicate):
         return WebDriverWait(self.driver, TIMEOUT,
@@ -63,6 +99,9 @@ class HTMLHelper:
 
     def click_button_by_text(self, text, debug_name=''):
         self.click_button(f"//*[text()='{text}']", debug_name=debug_name)
+
+    def submit_button_by_text(self, text, debug_name=''):
+        self.submit_button(f"//*[text()='{text}']", debug_name=debug_name)
 
     def validate_cookie_policy(self):
         self.driver.get(ppmi_main_webpage)
@@ -157,18 +196,52 @@ class PPMINavigator(HTMLHelper):
                 return False
         return True
 
-    def Download(self) -> None:
+    def is_element_active(self, class_name) -> bool:
+        try:
+            name = f'{class_name}.active'
+            predicate = EC.presence_of_element_located(
+                (By.CLASS_NAME, name))
+            WebDriverWait(self.driver, 2,
+                          poll_frequency=1).until(predicate)
+        except (NoSuchElementException, TimeoutException):
+            return False
+        else:
+            return True
+
+    def has_HamburgerMenu(self) -> bool:
+        try:
+            return self.driver.find_element(By.CLASS_NAME, 'ida-menu-hamburger').is_displayed()
+        except NoSuchElementException:
+            return False
+        else:
+            return True
+
+    def HamburgerMenu(self) -> None:
         def postcondition() -> bool:
-            try:
-                name = 'ida-menu-option.sub-menu.download.active'
-                predicate = EC.presence_of_element_located(
-                    (By.CLASS_NAME, name))
-                WebDriverWait(self.driver, 2,
-                              poll_frequency=1).until(predicate)
-            except (NoSuchElementException, TimeoutException):
-                return False
-            else:
-                return True
+            return self.is_element_active('ida-menu-main-options')
+
+        while not postcondition():
+            self.click_button('ida-menu-hamburger',
+                              BY=By.CLASS_NAME,
+                              debug_name='Hamburger menu')
+
+    def HamburgerMenu_Download(self) -> None:
+        def postcondition() -> bool:
+            return self.is_element_active('ida-menu-option.sub-menu.download')
+
+        while not postcondition():
+            self.click_button('ida-menu-option.sub-menu.download',
+                              BY=By.CLASS_NAME,
+                              debug_name='Download Hamburger submenu')
+
+    def Download(self) -> None:
+        if self.has_HamburgerMenu():
+            self.HamburgerMenu()
+            self.HamburgerMenu_Download()
+
+        def postcondition() -> bool:
+            return self.is_element_active('ida-menu-option.sub-menu.download')
+
         while not postcondition():
             self.click_button('ida-menu-option.sub-menu.download',
                               BY=By.CLASS_NAME,
@@ -278,3 +351,55 @@ class PPMINavigator(HTMLHelper):
             logger.debug(not postcondition())
             self.click_button_by_text("Advanced Image Search (beta)",
                                       debug_name="Advanced Image Search (beta)")
+
+    def Search_AdvancedImageSearchbeta_SelectAll(self) -> None:
+        '''
+        Parent: Search
+        '''
+        def predicate(driver) -> bool:
+            select_all = driver.find_element(By.ID, 'advResultSelectAll')
+            add_to_collection = driver.find_element(By.ID,
+                                                    'advResultAddCollectId')
+            logger.debug(select_all, select_all.is_selected())
+            logger.debug(add_to_collection, add_to_collection.is_enabled())
+            return select_all.is_selected() and add_to_collection.is_enabled()
+
+        def postcondition() -> bool:
+            try:
+                WebDriverWait(self.driver, 2,
+                              poll_frequency=1).until(predicate)
+            except (NoSuchElementException, TimeoutException):
+                return False
+            else:
+                return True
+
+        while not postcondition():
+            logger.debug(not postcondition())
+            self.click_button("advResultSelectAll", By.ID,
+                              debug_name='Select All')
+
+    def Search_AdvancedImageSearchbeta_AddToCollection_OK(self) -> None:
+        '''
+        Parent: Search
+        '''
+        def postcondition() -> bool:
+            # Check that the dialog panel has disappeared
+            try:
+                return not self.driver.find_element(By.ID, 'regroupDialog').is_displayed()
+            except (NoSuchElementException):
+                return True
+            else:
+                return False
+
+        while not postcondition():
+            logger.debug(not postcondition())
+            ok = None
+            for elt in self.driver.find_elements(By.TAG_NAME, 'button'):
+                if elt.text == 'OK':
+                    ok = elt
+            try:
+                ok.click()
+            except AttributeError:
+                continue
+            except StaleElementReferenceException:
+                break
