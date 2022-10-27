@@ -85,7 +85,6 @@ class PPMIDownloader:
         password = None
 
         read_config = False  # will set to True if credentials are read from config file
-        logger.debug(self.config_file)
 
         # look in config file
         if op.exists(self.config_file):
