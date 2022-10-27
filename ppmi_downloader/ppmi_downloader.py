@@ -54,7 +54,7 @@ class PPMIDownloader:
         (2) looking in environment variables PPMI_LOGIN and PPMI_PASSWORD,
         (3) prompting the user.
         """
-        self.__set_credentials()
+        self.__set_credentials(config_file)
 
         # Ids of the download checkboxes in the PPMI metadata download page
         file_ids_path = Path(__file__).parent.joinpath(
@@ -64,7 +64,6 @@ class PPMIDownloader:
 
         with open(file_ids_path, 'r', encoding='utf-8') as fin:
             self.file_ids = json.load(fin)
-        self.config_file = config_file
 
         logger.debug(self.config_file, config_file)
 
@@ -72,13 +71,15 @@ class PPMIDownloader:
         if hasattr(self, "driver"):
             self.driver.close()
 
-    def __set_credentials(self):
+    def __set_credentials(self, config_file):
         """
         Set PPMI credentials by (1) looking in config file (default:
         .ppmi_config in current working directory), (2) looking in
         environment variables PPMI_LOGIN and PPMI_PASSWORD, (3) prompting
         the user.
         """
+
+        self.config_file = config_file
 
         # These variables will be set by the configuration
         login = None
