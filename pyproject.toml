@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools>=61.0"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling", "pathspec"]
+build-backend = "hatchling.build"
 
 [project]
 name = "ppmi_downloader"
@@ -21,10 +21,14 @@ dependencies = [
     "tqdm==4.57.0",
     "beautifulsoup4==4.10.0",
     "lxml==4.8.0",
+    "pathspec==0.10.1",
+    "spython==0.2.14",
 ]
 
-[tool.setuptools]
-packages = ["ppmi_downloader"]
+[project.scripts]
+build_selenium = "ppmi_downloader.selenium_grid_utils:build"
+run_selenium = "ppmi_downloader.selenium_grid_utils:run"
+
 
 [project.urls]
 "Bug Tracker" = "https://github.com/LivingPark-MRI/ppmi-scraper/issues"

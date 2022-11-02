@@ -41,3 +41,19 @@ jobs:
         PPMI_PASSWORD: ${{ secrets.PPMI_PASSWORD }}
       run: |
         pytest -v
+    - uses: eWaterCycle/setup-singularity@v7
+      with:
+        singularity-version: 3.8.3
+    - name: Test for Selenium-Grid with pytest 
+      env:
+        PPMI_LOGIN: ${{ secrets.PPMI_USER }}
+        PPMI_PASSWORD: ${{ secrets.PPMI_PASSWORD }}
+        PPMI_SINGULARITY_BUILD_VERBOSE: True
+        PPMI_SINGULARITY_RUN_VERBOSE: True
+      run: |
+        build_selenium
+        run_selenium &
+        GRID_PID=$!
+        sleep 60
+        pytest -v --remote=hostname
+        kill -9 ${GRID_PID}
