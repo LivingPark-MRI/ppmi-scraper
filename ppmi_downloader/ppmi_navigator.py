@@ -29,7 +29,8 @@ class HTMLHelper:
     def __init__(self, driver) -> None:
         self.driver = driver
 
-    def wait_for_element_to_be_visible(self, field, BY=By.XPATH):
+    def wait_for_element_to_be_visible(self, field, BY=By.XPATH, timeout=TIMEOUT, debug_name=''):
+        logger.debug('Wait for element to be visible', field, BY, debug_name)
         predicate = EC.visibility_of_element_located((BY, field))
         element = WebDriverWait(self.driver, TIMEOUT,
                                 poll_frequency=1).until(predicate)
@@ -40,8 +41,9 @@ class HTMLHelper:
                    debug_name='',
                    trials=TRIALS):
         if trials < 0:
-            logger.error('Number of trials is exceeded')
+            self.driver.get_screenshot_as_file(f'error-{time.time_ns()}.png')
             self.driver.quit()
+            logger.error('Number of trials is exceeded')
         try:
             logger.debug('Enter data', field, debug_name)
             predicate = EC.element_to_be_clickable((BY, field))
@@ -55,8 +57,9 @@ class HTMLHelper:
 
     def click_button(self, field, BY=By.XPATH, debug_name='', trials=TRIALS):
         if trials < 0:
-            logger.error('Number of trials is exceeded')
+            self.driver.get_screenshot_as_file(f'~/error-{time.time_ns()}.png')
             self.driver.quit()
+            logger.error('Number of trials is exceeded')
         try:
             logger.debug('Click button', field, debug_name)
             predicate = EC.element_to_be_clickable((BY, field))
@@ -105,6 +108,11 @@ class HTMLHelper:
 
     def validate_cookie_policy(self):
         self.driver.get(ppmi_main_webpage)
+        if (cookie := self.driver.get_cookie('idaCookiePolicy')) is not None:
+            if cookie['value']:
+                logger.debug('Cookie Policy already accepted')
+                return
+
         try:
             self.click_button("ida-cookie-policy-accept",
                               BY=By.CLASS_NAME, debug_name='Cookie Policy')
@@ -120,6 +128,14 @@ class HTMLHelper:
     def login(self, email, password):
         self.validate_cookie_policy()
         self.driver.get(ppmi_login_webpage)
+        try:
+            self.wait_for_element_to_be_visible(
+                'ida-user-username', BY=By.CLASS_NAME)
+            logger.debug('Already logged in')
+            return
+        except (NoSuchElementException, TimeoutException):
+            pass
+
         self.wait_for_element_to_be_visible('userEmail', BY=By.NAME)
         self.enter_data("userEmail", email, BY=By.NAME, debug_name='Email')
         self.wait_for_element_to_be_visible('userPassword', BY=By.NAME)
@@ -343,14 +359,22 @@ class PPMINavigator(HTMLHelper):
         '''
         def postcondition() -> bool:
             time.sleep(1)
-            return self.check_url_query(self.driver.current_url,
-                                        {'page': 'SEARCH',
-                                         'subPage': 'NEW_ADV_QUERY'})
+            try:
+                return self.driver.find_element(By.ID, 'advSearchTabId').get_attribute('title') == 'active'
+            except NoSuchElementException:
+                return False
 
         while not postcondition():
+            try:
+                predicate = EC.presence_of_element_located(
+                    (By.ID, 'advResultTabId'))
+                self.wait_for(predicate)
+                text = 'Advanced Search (beta)'
+            except TimeoutException:
+                text = 'Advanced Image Search (beta)'
+
             logger.debug(not postcondition())
-            self.click_button_by_text("Advanced Image Search (beta)",
-                                      debug_name="Advanced Image Search (beta)")
+            self.click_button_by_text(text, debug_name=text)
 
     def Search_AdvancedImageSearchbeta_SelectAll(self) -> None:
         '''

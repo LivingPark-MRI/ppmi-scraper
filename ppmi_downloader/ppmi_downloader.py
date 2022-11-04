@@ -1,15 +1,16 @@
-import time
 import getpass
 import glob
 import json
 import os
 import os.path as op
-import shutil
 import string
 import tempfile
 import xml.etree.ElementTree as ET
 from configparser import ConfigParser
 from pathlib import Path
+from contextlib import contextmanager
+import signal
+import socket
 
 import tqdm
 from bs4 import BeautifulSoup
@@ -17,6 +18,7 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
 from webdriver_manager.chrome import ChromeDriverManager
+from selenium.common.exceptions import (TimeoutException)
 
 import ppmi_downloader.ppmi_logger as logger
 from ppmi_downloader.ppmi_navigator import (PPMINavigator,
@@ -24,15 +26,54 @@ from ppmi_downloader.ppmi_navigator import (PPMINavigator,
                                             ppmi_home_webpage)
 
 
-def get_driver(headless, tempdir):
+def get_ip_hostname():
+    return socket.gethostbyname(socket.gethostname()) + ':4444'
+
+
+@contextmanager
+def timeout_manager(timeout):
+    # Register a function to raise a TimeoutError on the signal.
+    signal.signal(signal.SIGALRM, raise_timeout)
+    # Schedule the signal to be sent after ``time``.
+    signal.alarm(timeout)
+
+    try:
+        yield
+    except TimeoutError:
+        pass
+    finally:
+        # Unregister the signal so it won't be triggered
+        # if the timeout is not reached.
+        signal.signal(signal.SIGALRM, signal.SIG_IGN)
+
+
+def raise_timeout(signum, frame):
+    raise TimeoutError
+
+
+def get_driver(headless, tempdir, remote=None):
     # Create Chrome webdriver
     options = webdriver.ChromeOptions()
-    prefs = {"download.default_directory": tempdir}
+    prefs = {"download.default_directory": tempdir,
+             "download.prompt_for_download": False}
     options.add_experimental_option("prefs", prefs)
     if headless:
         options.add_argument("--headless")
-    driver = webdriver.Chrome(
-        ChromeDriverManager().install(), chrome_options=options)
+    if remote is None:
+        driver = webdriver.Chrome(
+            ChromeDriverManager().install(), chrome_options=options)
+    else:
+        if remote == 'hostname':
+            remote = get_ip_hostname()
+
+        options.add_argument('--ignore-ssl-errors=yes')
+        options.add_argument('--ignore-certificate-errors')
+        options.add_argument('--headless')
+        driver = None
+        with timeout_manager(30):
+            driver = webdriver.Remote(remote, options=options)
+        if driver is None:
+            logger.error('Unable to reach Remote selenium webdriver')
 
     driver.set_window_size(1200, 720)
     driver.maximize_window()
@@ -47,14 +88,22 @@ class PPMIDownloader:
 
     file_ids_default_path = 'file_id.json'
 
-    def __init__(self, config_file=".ppmi_config"):
+    def __init__(self, config_file=".ppmi_config", headless=True, tempdir='/tmp/', remote=None):
         """
         Initializes PPMI downloader. Set PPMI credentials by (1) looking in
         config file (default: .ppmi_config in current working directory),
         (2) looking in environment variables PPMI_LOGIN and PPMI_PASSWORD,
         (3) prompting the user.
         """
+        self.remote = remote
         self.__set_credentials(config_file)
+        self.tempdir = tempfile.TemporaryDirectory(
+            dir=os.path.abspath(tempdir))
+        self.driver = get_driver(
+            headless=headless, tempdir=self.tempdir.name, remote=remote)
+        self.html = PPMINavigator(self.driver)
+
+        logger.debug(self.tempdir)
 
         # Ids of the download checkboxes in the PPMI metadata download page
         self.file_ids_path = Path(__file__).parent.joinpath(
@@ -67,9 +116,16 @@ class PPMIDownloader:
 
         logger.debug(self.config_file, config_file)
 
+    def quit(self):
+        self.tempdir.cleanup()
+        self.driver.delete_all_cookies()
+        self.driver.quit()
+
     def __del__(self):
-        if hasattr(self, "driver"):
-            self.driver.close()
+        try:
+            self.quit()
+        except Exception:
+            pass
 
     def __set_credentials(self, config_file):
         """
@@ -123,9 +179,6 @@ class PPMIDownloader:
         Initialize a driver, a ppmi navigator
         and login to ppmi portal
         '''
-        tempdir = tempfile.TemporaryDirectory(dir=os.getcwd())
-        self.driver = get_driver(headless, tempdir.name)
-        self.html = PPMINavigator(self.driver)
         self.html.login(self.email, self.password)
 
     def crawl_checkboxes_id(self, soup):
@@ -166,7 +219,7 @@ class PPMIDownloader:
         with open(cache_file, 'w', encoding='utf-8') as fo:
             json.dump(study_name_to_checkbox_clean, fo, indent=0)
 
-        self.driver.close()
+        # self.driver.close()
 
     def crawl_advanced_search(self,
                               cache_file='search_to_checkbox_id.json',
@@ -183,7 +236,7 @@ class PPMIDownloader:
         with open(cache_file, 'w', encoding='utf-8') as fo:
             json.dump(criteria_name_to_checkbox_id, fo, indent=0)
 
-        self.driver.close()
+        # self.driver.close()
 
     def download_imaging_data(
         self,
@@ -217,12 +270,12 @@ class PPMIDownloader:
         subjectIds = ",".join([str(i) for i in subject_ids])
 
         # Create Chrome webdriver
-        tempdir = op.abspath(tempfile.mkdtemp(dir="."))
-        self.driver = get_driver(headless, tempdir)
+        # tempdir = op.abspath(tempfile.mkdtemp(dir="."))
+        # self.driver = get_driver(headless, tempdir, self.remote)
 
         # Login to PPMI
         self.driver.get(ppmi_main_webpage)
-        self.html = PPMINavigator(self.driver)
+        # self.html = PPMINavigator(self.driver)
         self.html.login(self.email, self.password)
 
         # navigate to search page
@@ -239,7 +292,7 @@ class PPMIDownloader:
         # self.html.click_button("advResultSelectAll", By.ID)
         self.html.click_button("advResultAddCollectId", By.ID)
         self.html.enter_data("nameText",
-                             f"images-{op.basename(tempdir)}", By.ID)
+                             f"images-{op.basename(self.tempdir.name)}", By.ID)
         self.html.click_button('nameText', By.ID)
         self.html.Search_AdvancedImageSearchbeta_AddToCollection_OK()
 
@@ -252,39 +305,48 @@ class PPMIDownloader:
         self.html.click_button("simple-download-button", By.ID)
 
         # Download imaging data and metadata
-        self.html.click_button("simple-download-link", By.ID)
-        self.html.click_button(
-            (
-                '//*[@class="simple-download-metadata-link-text singlefile-download-metadata-link"]'
-            )
-        )
+
+        self.html.click_button("Zip File", By.PARTIAL_LINK_TEXT)
+        self.html.click_button("Metadata", By.PARTIAL_LINK_TEXT)
+        # self.html.click_button("simple-download-link", By.ID)
+        # self.html.click_button(
+        #     (
+        #         '//*[@class="simple-download-metadata-link-text singlefile-download-metadata-link"]'
+        #     )
+        # )
 
         # Wait for download to complete
         def download_complete(driver):
-            downloaded_files = os.listdir(tempdir)
-            assert len(downloaded_files) <= 3
+            downloaded_files = os.listdir(self.tempdir.name)
+            # assert len(downloaded_files) <= 3
             if len(downloaded_files) == 0:
                 return False
             for f in downloaded_files:
                 if f.endswith(".crdownload"):
+                    filename = os.path.join(self.tempdir.name, f)
+                    size = os.stat(filename).st_size
+                    logger.debug('Size', size)
                     return False
             assert f.endswith(('.csv', '.zip', '.dcm', '.xml')), f
             return True
 
-        WebDriverWait(self.driver, timeout).until(download_complete)
-
+        try:
+            WebDriverWait(self.driver, timeout).until(download_complete)
+        except TimeoutException:
+            self.quit()
+            logger.error('Timeout when downloading imaging data', subject_ids)
         # Move file to cwd or extract zip file
-        downloaded_files = os.listdir(tempdir)
+        downloaded_files = os.listdir(self.tempdir.name)
 
         # we got imaging data and metadata
         assert len(downloaded_files) == 3
 
         # unzip files
         self.html.unzip_imaging_data(
-            downloaded_files, tempdir, destination_dir)
+            downloaded_files, self.tempdir.name, destination_dir)
 
-        # Remove tempdir
-        shutil.rmtree(tempdir, ignore_errors=True)
+        # # Remove tempdir
+        # shutil.rmtree(tempdir, ignore_errors=True)
 
     def download_3D_T1_info(self, headless=True, timeout=120, destination_dir="."):
         """
@@ -296,12 +358,12 @@ class PPMIDownloader:
         * destination_dir: directory where to store the downloaded files
         """
         # Create Chrome webdriver
-        tempdir = op.abspath(tempfile.mkdtemp(dir="."))
-        self.driver = get_driver(headless, tempdir)
+        # tempdir = op.abspath(tempfile.mkdtemp(dir="."))
+        # self.driver = get_driver(headless, tempdir, self.remote)
 
         # Login to PPMI
         self.driver.get(ppmi_main_webpage)
-        self.html = PPMINavigator(self.driver)
+        # self.html = PPMINavigator(self.driver)
         self.html.login(self.email, self.password)
 
         # navigate to metadata page
@@ -332,23 +394,33 @@ class PPMIDownloader:
 
         # Wait for download to complete
         def download_complete(driver):
-            downloaded_files = os.listdir(tempdir)
-            assert len(downloaded_files) <= 1
+            downloaded_files = os.listdir(self.tempdir.name)
+            # assert len(downloaded_files) <= 1
             if len(downloaded_files) == 0:
                 return False
-            f = downloaded_files[0]
-            if f.endswith(".crdownload"):
-                return False
+            for f in downloaded_files:
+                if f.endswith(".crdownload"):
+                    filename = os.path.join(self.tempdir.name, f)
+                    size = os.stat(filename).st_size
+                    logger.debug('Size', size)
+                    return False
+                if f.endswith('.csv'):
+                    return True
             assert f.endswith(".csv"), f"file ends with: {f}"
             return True
 
-        WebDriverWait(self.driver, timeout).until(download_complete)
+        try:
+            WebDriverWait(self.driver, timeout).until(download_complete)
+        except TimeoutException:
+            self.quit()
+            logger.error('Unable to download T1 3D information')
 
         # Move file to cwd or extract zip file
-        file_name = self.html.unzip_metadata(tempdir, destination_dir)
+        file_name = self.html.unzip_metadata(
+            self.tempdir.name, destination_dir)
 
         # Remove tempdir
-        shutil.rmtree(tempdir, ignore_errors=True)
+        # shutil.rmtree(tempdir, ignore_errors=True)
 
         return file_name
 
@@ -378,13 +450,13 @@ class PPMIDownloader:
                 )
 
         # Create Chrome webdriver
-        tempdir = op.abspath(tempfile.mkdtemp(dir="."))
+        # tempdir = op.abspath(tempfile.mkdtemp(dir="."))
 
-        self.driver = get_driver(headless, tempdir)
+        # self.driver = get_driver(headless, tempdir, self.remote)
 
         # Login to PPMI
         self.driver.get(ppmi_main_webpage)
-        self.html = PPMINavigator(self.driver)
+        # self.html = PPMINavigator(self.driver)
         self.html.login(self.email, self.password)
 
         # navigate to metadata page
@@ -401,24 +473,30 @@ class PPMIDownloader:
 
         # Wait for download to complete
         def download_complete(driver):
-            downloaded_files = os.listdir(tempdir)
-            assert len(downloaded_files) <= 1
+            downloaded_files = os.listdir(self.tempdir.name)
+            # assert len(downloaded_files) <= 1
             if len(downloaded_files) == 0:
                 return False
-            f = downloaded_files[0]
-            if f.endswith(".crdownload"):
-                return False
-            assert f.endswith(".csv") or f.endswith(
-                ".zip"), f"file ends with: {f}"
+            for f in downloaded_files:
+                if f.endswith(".crdownload"):
+                    filename = os.path.join(self.tempdir.name, f)
+                    size = os.stat(filename).st_size
+                    logger.debug('Size', size)
+                    return False
+            assert f.endswith((".csv", ".zip")), f"file ends with: {f}"
             return True
 
-        WebDriverWait(self.driver, timeout).until(download_complete)
+        try:
+            WebDriverWait(self.driver, timeout).until(download_complete)
+        except TimeoutException as e:
+            self.quit()
+            raise e
 
         # Move file to cwd or extract zip file
-        self.html.unzip_metadata(tempdir, destination_dir)
+        self.html.unzip_metadata(self.tempdir.name, destination_dir)
 
         # Remove tempdir
-        shutil.rmtree(tempdir, ignore_errors=True)
+        # shutil.rmtree(tempdir, ignore_errors=True)
 
 
 class PPMINiftiFileFinder:
@@ -507,7 +585,7 @@ class PPMINiftiFileFinder:
                 if child.tag == "study":
                     study_id, series_id, image_id, description = parse_study(
                         child)
-            assert not None in (
+            assert None not in (
                 subject_id,
                 visit_id,
                 study_id,
