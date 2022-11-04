@@ -3,6 +3,7 @@ from typing import List
 import time
 import os
 import os.path as op
+import shutil
 import zipfile
 import urllib.parse
 
@@ -161,7 +162,7 @@ class HTMLHelper:
         else:
             source = op.join(tempdir, filename)
             target = op.join(destination_dir, filename)
-            os.rename(source, target)
+            shutil.move(source, target)
             logger.info(f"Successfully downloaded file {filename}")
 
     def unzip_metadata(self, tempdir, destination_dir):
