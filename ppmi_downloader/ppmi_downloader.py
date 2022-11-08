@@ -3,27 +3,27 @@ import glob
 import json
 import os
 import os.path as op
+import signal
+import socket
 import string
 import tempfile
 import xml.etree.ElementTree as ET
 from configparser import ConfigParser
-from pathlib import Path
 from contextlib import contextmanager
-import signal
-import socket
+from pathlib import Path
+from typing import Optional, List
 
 import tqdm
 from bs4 import BeautifulSoup
 from selenium import webdriver
+from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
 from webdriver_manager.chrome import ChromeDriverManager
-from selenium.common.exceptions import (TimeoutException)
 
 import ppmi_downloader.ppmi_logger as logger
-from ppmi_downloader.ppmi_navigator import (PPMINavigator,
-                                            ppmi_main_webpage,
-                                            ppmi_home_webpage)
+from ppmi_downloader.ppmi_navigator import (PPMINavigator, ppmi_home_webpage,
+                                            ppmi_main_webpage)
 
 
 def get_ip_hostname():
@@ -51,7 +51,22 @@ def raise_timeout(signum, frame):
     raise TimeoutError
 
 
-def get_driver(headless, tempdir, remote=None):
+def get_driver(headless: bool, tempdir: str, remote: Optional[str] = None):
+    r'''Smart constructor for WebDriver
+
+    Parameters
+    ----------
+    headless : bool
+        Run the driver in headless mode
+    tempdir : str
+        Name of the directory to store downloads
+    remote : Optional[str]
+        If set, specifies the url of the selenium grid to connect on
+
+    Returns
+    -------
+    WebDriver
+    '''
     # Create Chrome webdriver
     options = webdriver.ChromeOptions()
     prefs = {"download.default_directory": tempdir,
@@ -88,12 +103,28 @@ class PPMIDownloader:
 
     file_ids_default_path = 'file_id.json'
 
-    def __init__(self, config_file=".ppmi_config", headless=True, tempdir='/tmp/', remote=None):
-        """
-        Initializes PPMI downloader. Set PPMI credentials by (1) looking in
-        config file (default: .ppmi_config in current working directory),
+    def __init__(self, config_file: str = ".ppmi_config",
+                 headless: bool = True,
+                 tempdir: str = '/tmp/',
+                 remote: Optional[str] = None) -> None:
+        """Initialized PPMI downloader
+
+        Set PPMI credentials by
+        (1) looking in config file (default: .ppmi_config in current working directory),
         (2) looking in environment variables PPMI_LOGIN and PPMI_PASSWORD,
         (3) prompting the user.
+
+        Parameters
+        ----------
+        config_file : str
+            Name of the configuration file
+        headless : bool
+            Run the driver in headless mode
+        tempdir : str
+            Name of temporary directory for downloads
+        remote : Optional[str]
+            If set, specifies the url of the selenium grid to connect on
+
         """
         self.remote = remote
         self.__set_credentials(config_file)
@@ -116,7 +147,9 @@ class PPMIDownloader:
 
         logger.debug(self.config_file, config_file)
 
-    def quit(self):
+    def quit(self) -> None:
+        r'''Quits the driver and removes temporary files
+        '''
         self.tempdir.cleanup()
         self.driver.delete_all_cookies()
         self.driver.quit()
@@ -127,12 +160,18 @@ class PPMIDownloader:
         except Exception:
             pass
 
-    def __set_credentials(self, config_file):
-        """
-        Set PPMI credentials by (1) looking in config file (default:
-        .ppmi_config in current working directory), (2) looking in
-        environment variables PPMI_LOGIN and PPMI_PASSWORD, (3) prompting
-        the user.
+    def __set_credentials(self, config_file: str) -> None:
+        """Set PPMI credentials
+
+        Set PPMI credentials by
+        (1) looking in config file (default: .ppmi_config in current working directory)
+        (2) looking in environment variables PPMI_LOGIN and PPMI_PASSWORD
+        (3) prompting the user.
+
+        Parameters
+        ----------
+        config_file : str
+            Name of the configuration file
         """
 
         self.config_file = config_file
@@ -174,7 +213,7 @@ class PPMIDownloader:
         self.email = login
         self.password = password
 
-    def init_and_log(self, headless=True):
+    def init_and_log(self, headless: bool = True) -> None:
         '''
         Initialize a driver, a ppmi navigator
         and login to ppmi portal
@@ -182,6 +221,11 @@ class PPMIDownloader:
         self.html.login(self.email, self.password)
 
     def crawl_checkboxes_id(self, soup):
+        r'''Crawl for checboxes id and name
+
+        Crawl the current page for checkboxes and associated name
+        Print a warning if no checkbox is found
+        '''
         label_to_checkboxes_id = {}
         for checkbox in soup.find_all(type='checkbox'):
             if (checkbox_id := checkbox.get('id')) is not None:
@@ -195,8 +239,8 @@ class PPMIDownloader:
         return label_to_checkboxes_id
 
     def crawl_study_data(self,
-                         cache_file='study_data_to_checkbox_id.json',
-                         headless=True):
+                         cache_file: str = 'study_data_to_checkbox_id.json',
+                         headless: bool = True):
         '''
         Creates a mapping between Study data checkbox's name
         and their corresponding checkbox id
@@ -222,8 +266,8 @@ class PPMIDownloader:
         # self.driver.close()
 
     def crawl_advanced_search(self,
-                              cache_file='search_to_checkbox_id.json',
-                              headless=True):
+                              cache_file: str = 'search_to_checkbox_id.json',
+                              headless: bool = True):
         '''
         Creates a mapping between Advances Search checkboxe's name
         and their corresponding checkbox id
@@ -240,24 +284,29 @@ class PPMIDownloader:
 
     def download_imaging_data(
         self,
-        subject_ids,
-        headless=True,
-        timeout=600,
-        destination_dir=".",
-        type="archived",
+        subject_ids: List[int],
+        headless: bool = True,
+        timeout: float = 600,
+        destination_dir: str = ".",
+        type: str = "archived",
     ):
-        """
-        Download all imaging data files from PPMI. Requires Google Chrome.
+        r"""Download all imaging data files from PPMI. Requires Google Chrome.
 
-        Positional arguments
-        * subject_ids: list of subject ids
+        Parameters
+        ----------
+        subject_ids: List[int]
+            list of subject ids
+        headless : bool
+            if False, run Chrome not headless
+        timeout : bool
+            file download timeout, in seconds
+        destination_dir : str
+            directory where to store the downloaded files
+        type : str
+            can be 'archived' or 'nifti'. Archived means that the images are
+            downloaded as archived in the PPMI database, which usually means
+            in DICOM format.
 
-        Keyword arguments:
-        * headless: if False, run Chrome not headless
-        * timeout: file download timeout, in seconds
-        * destination_dir: directory where to store the downloaded files
-        * type: can be 'archived' or 'nifti'. Archived means that the images are
-        downloaded as archived in the PPMI database, which usually means in DICOM format.
         """
         assert type in (
             "archived",
@@ -269,13 +318,8 @@ class PPMIDownloader:
 
         subjectIds = ",".join([str(i) for i in subject_ids])
 
-        # Create Chrome webdriver
-        # tempdir = op.abspath(tempfile.mkdtemp(dir="."))
-        # self.driver = get_driver(headless, tempdir, self.remote)
-
         # Login to PPMI
         self.driver.get(ppmi_main_webpage)
-        # self.html = PPMINavigator(self.driver)
         self.html.login(self.email, self.password)
 
         # navigate to search page
@@ -289,7 +333,6 @@ class PPMIDownloader:
         self.html.enter_data('subjectIdText', subjectIds, By.ID)
         self.html.click_button("advSearchQuery", By.ID)
         self.html.Search_AdvancedImageSearchbeta_SelectAll()
-        # self.html.click_button("advResultSelectAll", By.ID)
         self.html.click_button("advResultAddCollectId", By.ID)
         self.html.enter_data("nameText",
                              f"images-{op.basename(self.tempdir.name)}", By.ID)
@@ -305,15 +348,8 @@ class PPMIDownloader:
         self.html.click_button("simple-download-button", By.ID)
 
         # Download imaging data and metadata
-
         self.html.click_button("Zip File", By.PARTIAL_LINK_TEXT)
         self.html.click_button("Metadata", By.PARTIAL_LINK_TEXT)
-        # self.html.click_button("simple-download-link", By.ID)
-        # self.html.click_button(
-        #     (
-        #         '//*[@class="simple-download-metadata-link-text singlefile-download-metadata-link"]'
-        #     )
-        # )
 
         # Wait for download to complete
         def download_complete(driver):
@@ -345,21 +381,22 @@ class PPMIDownloader:
         self.html.unzip_imaging_data(
             downloaded_files, self.tempdir.name, destination_dir)
 
-        # # Remove tempdir
-        # shutil.rmtree(tempdir, ignore_errors=True)
+    def download_3D_T1_info(self,
+                            headless: bool = True,
+                            timeout: float = 120,
+                            destination_dir: str = "."):
+        r"""Download csv file containing information about available 3D MRIs
 
-    def download_3D_T1_info(self, headless=True, timeout=120, destination_dir="."):
-        """
-        Download csv file containing information about available 3D MRIs
+        Parameters
+        ----------
+        headless : bool
+            if False, run Chrome not headless
+        timeout : float
+            file download timeout, in seconds
+        destination_dir : str
+            directory where to store the downloaded files
 
-        Keyword arguments:
-        * headless: if False, run Chrome not headless
-        * timeout: file download timeout, in seconds
-        * destination_dir: directory where to store the downloaded files
         """
-        # Create Chrome webdriver
-        # tempdir = op.abspath(tempfile.mkdtemp(dir="."))
-        # self.driver = get_driver(headless, tempdir, self.remote)
 
         # Login to PPMI
         self.driver.get(ppmi_main_webpage)
@@ -419,27 +456,31 @@ class PPMIDownloader:
         file_name = self.html.unzip_metadata(
             self.tempdir.name, destination_dir)
 
-        # Remove tempdir
-        # shutil.rmtree(tempdir, ignore_errors=True)
-
         return file_name
 
-    def download_metadata(
-        self, file_ids, headless=True, timeout=120, destination_dir="."
-    ):
+    def download_metadata(self,
+                          file_ids: str | List[str],
+                          headless: bool = True,
+                          timeout: float = 120,
+                          destination_dir: str = "."
+                          ) -> None:
         """
           Download metadata files from PPMI. Requires Google Chrome.
 
-          Positional arguments
-          * file_ids: list of file ids included in self.file_ids.keys
+          Parameters
+          ----------
+          file_ids: str | List[str]
+            list of file ids included in self.file_ids.keys
+          headless : bool
+            if False, run Chrome not headless
+          timeout : float
+            file download timeout, in seconds
+          destination_dir : str
+            directory where to store the downloaded files
 
-          Keyword arguments:
-          * headless: if False, run Chrome not headless
-          * timeout: file download timeout, in seconds
-          * destination_dir: directory where to store the downloaded files
           """
 
-        if not type(file_ids) is list:
+        if not isinstance(file_ids, list):
             file_ids = [file_ids]
 
         for file_name in tqdm.tqdm(file_ids):
@@ -448,11 +489,6 @@ class PPMIDownloader:
                     f"Unsupported file name: {file_name}."
                     f"Supported files: {self.file_ids}"
                 )
-
-        # Create Chrome webdriver
-        # tempdir = op.abspath(tempfile.mkdtemp(dir="."))
-
-        # self.driver = get_driver(headless, tempdir, self.remote)
 
         # Login to PPMI
         self.driver.get(ppmi_main_webpage)
@@ -494,9 +530,6 @@ class PPMIDownloader:
 
         # Move file to cwd or extract zip file
         self.html.unzip_metadata(self.tempdir.name, destination_dir)
-
-        # Remove tempdir
-        # shutil.rmtree(tempdir, ignore_errors=True)
 
 
 class PPMINiftiFileFinder:
