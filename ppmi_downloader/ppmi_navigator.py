@@ -1,22 +1,21 @@
-from typing import Dict
-from typing import List
-import time
 import os
 import os.path as op
 import shutil
-import zipfile
+import time
 import urllib.parse
+import zipfile
+from typing import Dict, List, Callable, Any
 
 import selenium.webdriver.support.expected_conditions as EC
 import tqdm
 from selenium.common.exceptions import (ElementClickInterceptedException,
                                         NoSuchElementException,
-                                        WebDriverException,
-                                        TimeoutException,
-                                        StaleElementReferenceException)
+                                        StaleElementReferenceException,
+                                        TimeoutException, WebDriverException)
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
-
+from selenium.webdriver.chrome.webdriver import WebDriver as ChromeWebDriver
+from selenium.webdriver.remote.webdriver import WebElement
 import ppmi_downloader.ppmi_logger as logger
 
 TIMEOUT = 5
@@ -27,22 +26,97 @@ ppmi_login_webpage = 'https://ida.loni.usc.edu/explore/jsp/common/login.jsp?proj
 
 
 class HTMLHelper:
-    def __init__(self, driver) -> None:
+    r'''
+    HTML helper to interact with selenium
+
+
+    Attributes
+    ----------
+    driver :  module selenium.webdriver.chrome.webdriver.Webdriver
+        Selenium webdriver
+
+    '''
+
+    def __init__(self, driver: ChromeWebDriver) -> None:
+        r'''__init__ method
+
+        Parameters
+        ----------
+        driver : selenium.webdriver.chrome.webdriver.WebDriver
+            Selenium driver
+
+        '''
         self.driver = driver
 
-    def wait_for_element_to_be_visible(self, field, BY=By.XPATH, timeout=TIMEOUT, debug_name=''):
+    def take_screenshot(self, function: str) -> None:
+        r'''Take screenshot of the driver current page
+
+        Parameters
+        ----------
+        function : str
+            Name of the function
+        '''
+        self.driver.get_screenshot_as_file(
+            f'error-{function}-{time.time_ns()}.png')
+
+    def wait_for_element_to_be_visible(self, field: str,
+                                       BY: By = By.XPATH,
+                                       timeout: float = TIMEOUT,
+                                       debug_name: str = '') -> WebElement:
+        r'''Wait for element to be visible
+
+        Parameters
+        ----------
+        field : str
+            The field used to find the element
+        BY : selenium.webdriver.common.by.By
+            Locator strategy
+        timeout : float
+            Timeout after which WebDriverWait will raise a TimeoutError
+        debug_name : str
+            Debug name used by the logger
+
+        Returns
+        -------
+        WebElement
+            Element found by WebDriverWait
+            An Exception is raised by WebDriverWait if not
+
+        '''
         logger.debug('Wait for element to be visible', field, BY, debug_name)
         predicate = EC.visibility_of_element_located((BY, field))
-        element = WebDriverWait(self.driver, TIMEOUT,
+        element = WebDriverWait(self.driver, timeout,
                                 poll_frequency=1).until(predicate)
         return element
 
-    def enter_data(self, field, data,
-                   BY=By.XPATH,
-                   debug_name='',
-                   trials=TRIALS):
+    def enter_data(self, field: str,
+                   data: str,
+                   BY: By = By.XPATH,
+                   debug_name: str = '',
+                   trials: int = TRIALS) -> None:
+        r'''Enter data in the given field
+
+        The function try to wait for the element to be clickable
+        `trials` times. After `trials` attempt, the function
+        quit the driver, takes a screenshot of the page
+        and displays an error message.
+
+        Parameters
+        ----------
+        field : str
+            The field used to find the element
+        data : str
+            The data to send to the element
+        BY : selenium.webdriver.common.by.By
+            Locator strategy
+        debug_name : str
+            Debug name used by the logger
+        trials : int
+            Number of trials before quiting
+
+        '''
         if trials < 0:
-            self.driver.get_screenshot_as_file(f'error-{time.time_ns()}.png')
+            self.take_screenshot('enter_data')
             self.driver.quit()
             logger.error('Number of trials is exceeded')
         try:
@@ -56,9 +130,33 @@ class HTMLHelper:
                             debug_name=debug_name,
                             trials=trials - 1)
 
-    def click_button(self, field, BY=By.XPATH, debug_name='', trials=TRIALS):
+    def click_button(self, field: str,
+                     BY: By = By.XPATH,
+                     debug_name: str = '',
+                     trials: int = TRIALS) -> None:
+        r'''Click the button given by the field
+
+        The function try to wait for the element to be clickable
+        `trials` times. After `trials` attempt, the function
+        quit the driver, takes a screenshot of the page
+        and displays an error message.
+
+        Parameters
+        ----------
+        field : str
+            The field used to find the element
+        data : str
+            The data to send to the element
+        BY : selenium.webdriver.common.by.By
+            Locator strategy
+        debug_name : str
+            Debug name used by the logger
+        trials : int
+            Number of trials before quiting
+
+        '''
         if trials < 0:
-            self.driver.get_screenshot_as_file(f'~/error-{time.time_ns()}.png')
+            self.take_screenshot('click_button')
             self.driver.quit()
             logger.error('Number of trials is exceeded')
         try:
@@ -72,20 +170,33 @@ class HTMLHelper:
                               debug_name=debug_name,
                               trials=trials - 1)
 
-    # def click_button(self, field, BY=By.XPATH, debug_name='', trials=TRIALS):
-    #     elements = self.driver.find_elements(BY, field)
-    #     if len(elements) > 1:
-    #         logger.warning('Multiple elements found for ', field)
-    #         logger.warning(
-    #             'Try a more restrictive mark to avoid selecting misleading elements')
+    def submit_button(self, field: str,
+                      BY: By = By.XPATH,
+                      debug_name: str = '',
+                      trials: int = TRIALS) -> None:
+        r'''Send submit to the button given by the field
 
-    #     self._click_button(field=field, BY=By.XPATH,
-    #                        debug_name=debug_name, trials=trials)
+        The function try to wait for the element to be clickable
+        `trials` times. After `trials` attempt, the function
+        quit the driver, takes a screenshot of the page
+        and displays an error message.
 
-    def submit_button(self, field, BY=By.XPATH, debug_name='', trials=TRIALS):
+        Parameters
+        ----------
+        field : str
+            The field used to find the element
+        BY : selenium.webdriver.common.by.By
+            Locator strategy
+        debug_name : str
+            Debug name used by the logger
+        trials : int
+            Number of trials before quiting
+
+        '''
         if trials < 0:
-            logger.error('Number of trials is exceeded')
+            self.take_screenshot('submit_button')
             self.driver.quit()
+            logger.error('Number of trials is exceeded')
         try:
             logger.debug('Submit button', field, debug_name)
             predicate = EC.element_to_be_clickable((BY, field))
@@ -97,17 +208,62 @@ class HTMLHelper:
                                debug_name=debug_name,
                                trials=trials - 1)
 
-    def wait_for(self, predicate):
+    def wait_for(self, predicate: Callable[..., Any]) -> Any:
+        r'''Wrapper around WebDriverWait
+
+        Wait until `predicate` is true.
+        Return the object returned by `predicate`
+        upon success.
+
+
+        Parameters
+        ----------
+        predicate: Callable[..., Any]
+            Predicate to check
+
+        Returns
+        -------
+        Any
+            Any value returned by `predicate`
+
+        '''
         return WebDriverWait(self.driver, TIMEOUT,
                              poll_frequency=1).until(predicate)
 
-    def click_button_by_text(self, text, debug_name=''):
+    def click_button_by_text(self, text: str, debug_name: str = '') -> None:
+        r'''Helper function to click a button labeled `text`
+
+        Parameters
+        ----------
+        text : str
+            Text of the button to search
+        debug_name : str
+            Debug name used by the logger
+
+        '''
+
         self.click_button(f"//*[text()='{text}']", debug_name=debug_name)
 
-    def submit_button_by_text(self, text, debug_name=''):
+    def submit_button_by_text(self, text: str, debug_name: str = '') -> None:
+        r'''Helper function to send a submit to a button labeled `text`
+
+        Parameters
+        ----------
+        text : str
+            Text of the button to search
+        debug_name : str
+            Debug name used by the logger
+
+        '''
         self.submit_button(f"//*[text()='{text}']", debug_name=debug_name)
 
-    def validate_cookie_policy(self):
+    def validate_cookie_policy(self) -> None:
+        r'''Helper function to validate cookie policy
+
+        Function checks if the cookie are already accepted.
+        If not, click on the Cookie Policy Accept button
+
+        '''
         self.driver.get(ppmi_main_webpage)
         if (cookie := self.driver.get_cookie('idaCookiePolicy')) is not None:
             if cookie['value']:
@@ -120,13 +276,41 @@ class HTMLHelper:
         except ElementClickInterceptedException:
             logger.debug('Cookie Policy already accepted')
 
-    def find_all_anchors(self):
+    def find_all_anchors(self) -> List[WebElement]:
+        r'''Helper function to find all anchors in the current page
+
+        Returns
+        -------
+        List[WebElement]
+            A list of all anchors
+        '''
         return self.driver.find_elements(By.TAG_NAME, 'a')
 
-    def find_all_checkboxes(self):
+    def find_all_checkboxes(self) -> List[WebElement]:
+        r'''Find all checkboxes in the current page
+
+        Returns
+        -------
+        List[WebElement]
+            A list of all checkboxes
+        '''
         return self.driver.find_elements(By.XPATH, '//*[@type="checkbox"]')
 
-    def login(self, email, password):
+    def login(self, email: str, password: str) -> None:
+        r'''Help function to log to PPMI
+
+        Function checks if user is already logged in.
+        If not, enter email and password in the
+        corresponding fields
+
+        Parameters
+        ----------
+        email : str
+            User's email
+        password : str
+            Users's password
+
+        '''
         self.validate_cookie_policy()
         self.driver.get(ppmi_login_webpage)
         try:
@@ -152,7 +336,21 @@ class HTMLHelper:
         except NoSuchElementException:
             logger.info('Login Successful')
 
-    def unzip_file(self, filename, tempdir, destination_dir):
+    def unzip_file(self, filename: str, tempdir: str, destination_dir: str) -> None:
+        r'''Helper function to unzip a file
+
+        Function unzip `filename` into `tempdir` and
+        copy the output in `destination_dir`
+
+        Parameters
+        ----------
+        filename : str
+            Name of the file to unzip
+        tempdir : str
+            Name of the directory where to extract `filename`
+        destination_dir : str
+            Name of the directory where to copy unzipped file
+        '''
         if filename.endswith(".zip"):
             # unzip file to cwd
             with zipfile.ZipFile(op.join(tempdir, filename), "r") as zip_ref:
@@ -165,17 +363,39 @@ class HTMLHelper:
             shutil.move(source, target)
             logger.info(f"Successfully downloaded file {filename}")
 
-    def unzip_metadata(self, tempdir, destination_dir):
+    def unzip_metadata(self, source_dir: str, destination_dir: str) -> None:
+        r'''Helper function to unzip metadata
+
+        Parameters
+        ----------
+        source_dir : str
+            Name of the directory where metadata are located
+        destination_dir : str
+            Name of the directory where to copy files
+
+        '''
         # Move file to cwd or extract zip file
-        downloaded_files = os.listdir(tempdir)
+        downloaded_files = os.listdir(source_dir)
         # we got either a csv or a zip file
         assert len(downloaded_files) == 1
         file_name = downloaded_files[0]
         assert file_name.endswith((".zip", ".csv"))
-        self.unzip_file(file_name, tempdir, destination_dir)
+        self.unzip_file(file_name, source_dir, destination_dir)
         return file_name
 
-    def unzip_imaging_data(self, downloaded_files, tempdir, destination_dir):
+    def unzip_imaging_data(self, downloaded_files: List[str], tempdir: str, destination_dir: str) -> None:
+        r'''Helper function to unzip imaging data
+
+        Parameters
+        ----------
+        downloaded_files : List[str]
+            List of files to unzip
+        tempdir : str
+            Name of the directory where to extract `filename`
+        destination_dir : str
+            Name of the directory where to copy unzipped file
+
+        '''
         accepted_extension = ('.zip', '.csv', '.dcm', '.xml')
         for filename in tqdm.tqdm(downloaded_files):
             assert filename.endswith(accepted_extension), filename
@@ -184,19 +404,38 @@ class HTMLHelper:
 
 
 class PPMINavigator(HTMLHelper):
+    r'''Help class to navigate through webpage with selenium'''
 
     def click_chain_cleaner(self, action: str) -> str:
-        '''
+        r'''Clean action of action chain
+
         Clean action name to match function
+
+        Parameters
+        ----------
+        action : str
+            Name of the action to clean
+
+        Returns
+        -------
+        str
+            Cleaned action
         '''
         return action.replace('(', '').replace(')', '').replace(' ', '')
 
     def click_button_chain(self, chain: List[str]) -> None:
-        '''
-        Allows for chaining multiple actions represented as a list of string
+        r'''Click on each action in the chain
+
+        Allows for chaining multiple actions represented as a list of string.
         For example:
             ["Download","Study Data","ALL"]
         will click on Download then Study Data and finally ALL
+
+        Parameters
+        ----------
+        chain : List[str]
+            List of action to do
+
         '''
         action = []
         for action_name in chain:
@@ -204,6 +443,23 @@ class PPMINavigator(HTMLHelper):
             getattr(self, '_'.join(action))()
 
     def check_url_query(self, url: str, queries: Dict[str, str]) -> bool:
+        r'''Checks that url has `queries`
+
+        Parameters
+        ----------
+        url : str
+            The url to check
+        queries : Dict[str, str]
+            A dict of query to check where
+            key is the name of the query
+            value is the expected value for the query
+
+        Returns
+        -------
+        bool
+            True if all queries are present else False
+
+        '''
         query = urllib.parse.parse_qs(url)
         logger.debug(queries)
         for field, expected in queries.items():
@@ -213,7 +469,20 @@ class PPMINavigator(HTMLHelper):
                 return False
         return True
 
-    def is_element_active(self, class_name) -> bool:
+    def is_element_active(self, class_name: str) -> bool:
+        r'''Checks that element of class name `class_name` is active
+
+        Parameters
+        ----------
+        class_name : str
+            Class name of the element
+
+        Returns
+        -------
+        bool
+            True if the element is active else False
+
+        '''
         try:
             name = f'{class_name}.active'
             predicate = EC.presence_of_element_located(
@@ -226,6 +495,14 @@ class PPMINavigator(HTMLHelper):
             return True
 
     def has_HamburgerMenu(self) -> bool:
+        r'''Checks that HamburgerMenu is present in the current page
+
+        Returns
+        -------
+        bool:
+            True if the current page has HamburgerMenu else False
+
+        '''
         try:
             return self.driver.find_element(By.CLASS_NAME, 'ida-menu-hamburger').is_displayed()
         except NoSuchElementException:
@@ -234,6 +511,10 @@ class PPMINavigator(HTMLHelper):
             return True
 
     def HamburgerMenu(self) -> None:
+        r'''Action to click on HamburgerMenu
+
+        Click on button until postcondition is not met
+        '''
         def postcondition() -> bool:
             return self.is_element_active('ida-menu-main-options')
 
@@ -243,6 +524,10 @@ class PPMINavigator(HTMLHelper):
                               debug_name='Hamburger menu')
 
     def HamburgerMenu_Download(self) -> None:
+        r'''Action to click on "Download" in HamburgerMenu
+
+        Click on button until postcondition is not met
+        '''
         def postcondition() -> bool:
             return self.is_element_active('ida-menu-option.sub-menu.download')
 
@@ -252,6 +537,12 @@ class PPMINavigator(HTMLHelper):
                               debug_name='Download Hamburger submenu')
 
     def Download(self) -> None:
+        r'''Action to click on "Download"
+
+        Action detects if HamburgerMenu is enabled or not
+        to click on the correct Download button
+        Click on button until postcondition is not met
+        '''
         if self.has_HamburgerMenu():
             self.HamburgerMenu()
             self.HamburgerMenu_Download()
@@ -265,8 +556,10 @@ class PPMINavigator(HTMLHelper):
                               debug_name='Download')
 
     def Download_StudyData(self) -> None:
-        '''
-        Parent: Download
+        r'''Action to click on "Study Data" in "Download"
+
+        Precondition: Download action
+        Click on button until postcondition is not met
         '''
         studydata_url = 'https://ida.loni.usc.edu/pages/access/studyData.jsp'
         while not self.driver.current_url.startswith(studydata_url):
@@ -274,16 +567,20 @@ class PPMINavigator(HTMLHelper):
                                       debug_name='Study Data')
 
     def Download_StudyData_ALL(self) -> None:
-        '''
-        Parent: StudyData
+        r'''Action to click on "All" in "Study Data" in "Download"
+
+        Precondition: StudyData action
+        Click on button until postcondition is not met
         '''
         studydata_url = 'https://ida.loni.usc.edu/pages/access/studyData.jsp'
         while self.driver.current_url != studydata_url:
             self.click_button("ygtvlabelel71", BY=By.ID, debug_name='ALL')
 
     def Download_ImageCollections(self) -> None:
-        '''
-        Parent: Download
+        r'''Action to click on "Image Collections" in "Download"
+
+        Precondition: Download action
+        Click on button until postcondition is not met
         '''
         def postcondition() -> bool:
             time.sleep(1)
@@ -296,8 +593,10 @@ class PPMINavigator(HTMLHelper):
                 "Image Collections", debug_name='Image Collections')
 
     def Download_GeneticData(self) -> None:
-        '''
-        Parent: Download
+        r'''Action to click on "Genetic Data" in "Download"
+
+        Precondition: Download action
+        Click on button until postcondition is not met
         '''
         def postcondition() -> bool:
             time.sleep(1)
@@ -310,6 +609,10 @@ class PPMINavigator(HTMLHelper):
                                       debug_name='Generic Data')
 
     def Search(self) -> None:
+        r'''Action to click on "Search"
+
+        Click on button until postcondition is not met
+        '''
         def postcondition() -> bool:
             try:
                 name = 'ida-menu-option.sub-menu.search.active'
@@ -327,8 +630,10 @@ class PPMINavigator(HTMLHelper):
                               debug_name='Search')
 
     def Search_SimpleImageSearch(self) -> None:
-        '''
-        Parent: Search
+        r'''Action to click on "Simple Image Search" in Search
+
+        Precondition: Search action
+        Click on button until postcondition is not met
         '''
         def postcondition() -> bool:
             time.sleep(1)
@@ -341,8 +646,10 @@ class PPMINavigator(HTMLHelper):
                                       debug_name='Simple Image Search')
 
     def Search_AdvancedImageSearch(self) -> None:
-        '''
-        Parent: Search
+        r'''Action to click on "Advanced Image Search" in Search
+
+        Precondition: Search action
+        Click on button until postcondition is not met
         '''
         def postcondition() -> bool:
             time.sleep(1)
@@ -355,8 +662,10 @@ class PPMINavigator(HTMLHelper):
                                       debug_name='Advanced Image Search')
 
     def Search_AdvancedImageSearchbeta(self) -> None:
-        '''
-        Parent: Search
+        r'''Action to click on "Advanced Image Search (beta)" in Search
+
+        Precondition: Search action
+        Click on button until postcondition is not met
         '''
         def postcondition() -> bool:
             time.sleep(1)
@@ -378,8 +687,10 @@ class PPMINavigator(HTMLHelper):
             self.click_button_by_text(text, debug_name=text)
 
     def Search_AdvancedImageSearchbeta_SelectAll(self) -> None:
-        '''
-        Parent: Search
+        r'''Action to click on "Select All" in "Advanced Image Search (beta)"
+
+        Precondition: "Advanced Image Search (beta)" action
+        Click on button until postcondition is not met
         '''
         def predicate(driver) -> bool:
             select_all = driver.find_element(By.ID, 'advResultSelectAll')
@@ -404,8 +715,10 @@ class PPMINavigator(HTMLHelper):
                               debug_name='Select All')
 
     def Search_AdvancedImageSearchbeta_AddToCollection_OK(self) -> None:
-        '''
-        Parent: Search
+        r'''Action to click on "OK" in "Add to collection" in "Advanced Image Search (beta)"
+
+        Precondition: "Advanced Image Search (beta)" action
+        Click on button until postcondition is not met
         '''
         def postcondition() -> bool:
             # Check that the dialog panel has disappeared
