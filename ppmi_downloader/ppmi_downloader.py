@@ -114,6 +114,10 @@ class PPMIDownloader:
         (2) looking in environment variables PPMI_LOGIN and PPMI_PASSWORD,
         (3) prompting the user.
 
+        Optionally, the `PPMI_SINGULARITY_SELENIUM_REMOTE` environment variable can be
+        set has a fallback for `remote`. The value should be set to "hostname".
+        See also, `selenium_grid_utils::run` for more details.
+
         Parameters
         ----------
         config_file : str
@@ -127,11 +131,13 @@ class PPMIDownloader:
 
         """
         self.remote = remote
+        if self.remote is None:
+            self.remote = os.getenv("PPMI_SINGULARITY_SELENIUM_REMOTE")
         self.__set_credentials(config_file)
         self.tempdir = tempfile.TemporaryDirectory(
             dir=os.path.abspath(tempdir))
         self.driver = get_driver(
-            headless=headless, tempdir=self.tempdir.name, remote=remote)
+            headless=headless, tempdir=self.tempdir.name, remote=self.remote)
         self.html = PPMINavigator(self.driver)
 
         logger.debug(self.tempdir)
