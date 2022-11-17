@@ -52,6 +52,8 @@ def test_crawl_study_data(remote):
     cache_file = 'study_data_to_checkbox_id.json'
     ppmi.crawl_study_data(cache_file=cache_file, headless=headless)
     assert os.path.exists(cache_file)
+    with open(cache_file, 'r') as fi:
+        print(json.load(fi))
     ppmi.quit()
 
 
