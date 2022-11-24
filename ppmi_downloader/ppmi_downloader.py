@@ -257,10 +257,9 @@ class PPMIDownloader:
         study_name_to_checkbox = self.crawl_checkboxes_id(soup)
 
         def clean_name(name):
-            allow = string.ascii_letters + string.digits
-            cleaned = [''.join([c for c in token if c in allow])
-                       for token in name.split()]
-            return '_'.join(cleaned) + '.csv'
+            to_replace = {ord(c): '_' for c in (
+                string.whitespace + string.punctuation).replace('-', '')}
+            return str.translate(name, to_replace) + '.csv'
 
         study_name_to_checkbox_clean = {}
         for name, checkbox in study_name_to_checkbox.items():
