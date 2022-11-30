@@ -2,7 +2,7 @@ A downloader of PPMI metadata and imaging data files.
 
 # Example usage
 
-```
+```python
 import ppmi_downloader
 ppmi = ppmi_downloader.PPMIDownloader()
 
