@@ -40,7 +40,7 @@ Upon success, it exits with 0.
 Upon failure, Client raises exceptions caught by the script wrapper
 generated during the build
 
-## `run_selenium`
+## **`run_selenium`**
 
 Run selenium grid singularity container
 
