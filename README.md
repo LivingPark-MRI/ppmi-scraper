@@ -1,5 +1,7 @@
 A downloader of PPMI metadata and imaging data files.
 
+[![Python application](https://github.com/LivingPark-MRI/ppmi-scraper/actions/workflows/python-app.yml/badge.svg)](https://github.com/LivingPark-MRI/ppmi-scraper/actions/workflows/python-app.yml)
+
 # Example usage
 
 ```python
