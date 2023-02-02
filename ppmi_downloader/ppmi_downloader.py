@@ -101,7 +101,7 @@ class PPMIDownloader:
     See function download_metadata for usage.
     """
 
-    file_ids_default_path = 'file_id.json'
+    file_ids_default_path = 'study_data_to_checkbox_id.json'
 
     def __init__(self, config_file: str = ".ppmi_config",
                  headless: bool = True,
@@ -141,6 +141,9 @@ class PPMIDownloader:
         self.html = PPMINavigator(self.driver)
 
         logger.debug(self.tempdir)
+
+        # Load real metadata names
+        self._get_real_name()
 
         # Ids of the download checkboxes in the PPMI metadata download page
         self.file_ids_path = Path(__file__).parent.joinpath(
@@ -219,6 +222,17 @@ class PPMIDownloader:
         self.email = login
         self.password = password
 
+    def _get_real_name(self,
+                       cache_file: str = 'guessed_to_real.json') -> None:
+        '''
+        Initialize the attribute mapping guessed names from
+        crawling PPMI to actual downloaded files.
+        '''
+        with open(cache_file, 'r', encoding='utf-8') as fi:
+            self.guessed_to_real = json.load(fi)
+            self.real_to_guessed = {v: k for k,
+                                    v in self.guessed_to_real.items()}
+
     def init_and_log(self, headless: bool = True) -> None:
         '''
         Initialize a driver, a ppmi navigator
@@ -263,7 +277,8 @@ class PPMIDownloader:
 
         study_name_to_checkbox_clean = {}
         for name, checkbox in study_name_to_checkbox.items():
-            study_name_to_checkbox_clean[clean_name(name)] = checkbox
+            if checkbox.isdigit() and "Archived" not in name:
+                study_name_to_checkbox_clean[clean_name(name)] = checkbox
 
         with open(cache_file, 'w', encoding='utf-8') as fo:
             json.dump(study_name_to_checkbox_clean, fo, indent=0)
@@ -482,14 +497,15 @@ class PPMIDownloader:
             file download timeout, in seconds
           destination_dir : str
             directory where to store the downloaded files
-
           """
 
         if not isinstance(file_ids, list):
             file_ids = [file_ids]
 
+        supported_files = set(self.file_ids.keys()) | \
+            set(self.real_to_guessed.keys())
         for file_name in tqdm.tqdm(file_ids):
-            if file_name not in self.file_ids:
+            if file_name not in supported_files:
                 raise Exception(
                     f"Unsupported file name: {file_name}."
                     f"Supported files: {self.file_ids}"
@@ -506,7 +522,13 @@ class PPMIDownloader:
 
         # select file and download
         for file_name in file_ids:
-            for checkbox in self.driver.find_elements(By.ID, self.file_ids[file_name])[
+            # Look for the guessed name
+            # if not present, retrieve the guessed name from the real name
+            checkbox_id = self.file_ids.get(file_name, None)
+            if checkbox_id is None:
+                guess = self.real_to_guessed[file_name]
+                checkbox_id = self.file_ids.get(guess)
+            for checkbox in self.driver.find_elements(By.ID, checkbox_id)[
                 0:2
             ]:
                 checkbox.click()
