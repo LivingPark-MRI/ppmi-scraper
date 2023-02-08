@@ -574,7 +574,7 @@ class PPMINavigator(HTMLHelper):
         '''
         studydata_url = 'https://ida.loni.usc.edu/pages/access/studyData.jsp'
         while self.driver.current_url != studydata_url:
-            self.click_button("ygtvlabelel69", BY=By.ID, debug_name='ALL')
+            self.click_button("ygtvlabelel71", BY=By.ID, debug_name='ALL')
 
     def Download_ImageCollections(self) -> None:
         r'''Action to click on "Image Collections" in "Download"
