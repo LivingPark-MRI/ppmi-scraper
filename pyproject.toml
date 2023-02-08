@@ -20,7 +20,7 @@ dependencies = [
     "icecream",
     "lxml",
     "tqdm",
-    "beautifulsoup",
+    "beautifulsoup4",
     "pathspec",
     "spython",
 ]
