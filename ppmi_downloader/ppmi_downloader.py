@@ -515,7 +515,6 @@ class PPMIDownloader:
             if file_name not in supported_files:
                 raise Exception(
                     f"Unsupported file name: {file_name}."
-                    f"Supported files: {self.file_ids}"
                 )
 
         # Login to PPMI
