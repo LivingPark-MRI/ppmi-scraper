@@ -83,7 +83,7 @@ def test_download_metadata(remote):
 @ pytest.mark.flaky(reruns=3, reruns_delay=5)
 def test_download_3D_T1_info(remote):
     ppmi = PPMIDownloader(remote=remote, tempdir='.',  headless=headless)
-    ppmi.download_3D_T1_info(headless=headless)
+    ppmi.download_3D_T1_info()
     ppmi.quit()
 
 
@@ -91,6 +91,6 @@ def test_download_3D_T1_info(remote):
 def test_download_imaging_data(remote):
     ids = [3001, 3003, 3011]
     ppmi = PPMIDownloader(remote=remote, tempdir='.',  headless=headless)
-    ppmi.download_imaging_data(ids, headless=headless)
+    ppmi.download_imaging_data(ids)
     ppmi.download_imaging_data(ids, type="nifti")
     ppmi.quit()
