@@ -315,7 +315,6 @@ class PPMIDownloader:
     def download_imaging_data(
         self,
         subject_ids: List[int],
-        headless: bool = True,
         timeout: float = 600,
         destination_dir: str = ".",
         type: str = "archived",
@@ -326,8 +325,6 @@ class PPMIDownloader:
         ----------
         subject_ids: List[int]
             list of subject ids
-        headless : bool
-            if False, run Chrome not headless
         timeout : bool
             file download timeout, in seconds
         destination_dir : str
@@ -413,14 +410,12 @@ class PPMIDownloader:
         )
 
     def download_3D_T1_info(
-        self, headless: bool = True, timeout: float = 120, destination_dir: str = "."
+        self, timeout: float = 120, destination_dir: str = "."
     ):
         r"""Download csv file containing information about available 3D MRIs
 
         Parameters
         ----------
-        headless : bool
-            if False, run Chrome not headless
         timeout : float
             file download timeout, in seconds
         destination_dir : str
@@ -439,10 +434,14 @@ class PPMIDownloader:
 
         # Click 3D checkbox
         self.html.click_button("imgProtocol_checkBox1.Acquisition_Type.3D", By.ID)
-        # Click T1 checkbox
-        self.html.click_button("imgProtocol_checkBox1.Weighting.T1", By.ID)
         # Click checkbox to display visit name in results
         self.html.click_button("RESET_VISIT.0", By.ID)
+        # Click checkbox to display weighting in results
+        self.html.click_button("RESET_PROTOCOL_STRING.1_Weighting", By.ID)
+        # Click checkbox to display manufacturer in results
+        self.html.click_button("RESET_PROTOCOL_STRING.1_Manufacturer", By.ID)
+        # Click checkbox to display manufacturer model in results
+        self.html.click_button("RESET_PROTOCOL_STRING.1_Mfg_Model", By.ID)
         # Click checkbox to display study date in results
         self.html.click_button("RESET_STUDY.0", By.ID)
         # Click checkbox to display field strength in results
@@ -488,7 +487,6 @@ class PPMIDownloader:
     def download_metadata(
         self,
         file_ids: str | List[str],
-        headless: bool = True,
         timeout: float = 120,
         destination_dir: str = ".",
     ) -> None:
@@ -499,8 +497,6 @@ class PPMIDownloader:
         ----------
         file_ids: str | List[str]
           list of file ids included in self.file_ids.keys
-        headless : bool
-          if False, run Chrome not headless
         timeout : float
           file download timeout, in seconds
         destination_dir : str
