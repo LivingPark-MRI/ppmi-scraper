@@ -7,18 +7,18 @@ from configparser import ConfigParser
 import pytest
 from ppmi_downloader.ppmi_downloader import PPMIDownloader
 
-headless = True
 
-
-def test_ppmi_successing_login(remote):
+def test_ppmi_successing_login(remote, no_headless):
     # Requires PPMI_LOGIN and PPMI_PASSWORD
     # environment variables to be set
-    ppmi = PPMIDownloader(remote=remote)
-    ppmi.init_and_log(headless=headless)
+    headless = not no_headless
+    ppmi = PPMIDownloader(remote=remote, headless=headless)
+    ppmi.init_and_log()
     ppmi.quit()
 
 
-def test_ppmi_failing_login(remote):
+def test_ppmi_failing_login(remote, no_headless):
+    headless = not no_headless
     config_filename = tempfile.NamedTemporaryFile()
     config_parser = ConfigParser()
     config_parser['ppmi'] = {
@@ -28,46 +28,50 @@ def test_ppmi_failing_login(remote):
     with open(config_filename.name, 'w', encoding='utf-8') as fo:
         config_parser.write(fo)
         fo.flush()
-    ppmi_wrong = PPMIDownloader(
-        config_file=config_filename.name, remote=remote)
+    ppmi_wrong = PPMIDownloader(config_file=config_filename.name,
+                                remote=remote,
+                                headless=headless)
     with pytest.raises(SystemExit):
-        ppmi_wrong.init_and_log(headless=headless)
+        ppmi_wrong.init_and_log()
     ppmi_wrong.quit()
 
 
-def test_hamburger_menu(remote):
+def test_hamburger_menu(remote, no_headless):
     '''
     Test Download is correctly clicked when
     window is small (displayed hamburger menu)
     '''
-    ppmi = PPMIDownloader(remote=remote)
+    headless = not no_headless
+    ppmi = PPMIDownloader(remote=remote, headless=headless)
     ppmi.init_and_log()
     ppmi.driver.set_window_size(800, 600)
     ppmi.html.Download()
     ppmi.quit()
 
 
-def test_crawl_study_data(remote):
-    ppmi = PPMIDownloader(remote=remote)
+def test_crawl_study_data(remote, no_headless):
+    headless = not no_headless
+    ppmi = PPMIDownloader(remote=remote, headless=headless)
     cache_file = 'study_data_to_checkbox_id.json'
-    ppmi.crawl_study_data(cache_file=cache_file, headless=headless)
+    ppmi.crawl_study_data(cache_file=cache_file)
     assert os.path.exists(cache_file)
     with open(cache_file, 'r') as fi:
         print(json.load(fi))
     ppmi.quit()
 
 
-def test_crawl_advanced_search(remote):
+def test_crawl_advanced_search(remote, no_headless):
+    headless = not no_headless
     cache_file = 'search_to_checkbox_id.json'
-    ppmi = PPMIDownloader(remote=remote)
-    ppmi.crawl_advanced_search(cache_file=cache_file, headless=headless)
+    ppmi = PPMIDownloader(remote=remote, headless=headless)
+    ppmi.crawl_advanced_search(cache_file=cache_file)
     assert os.path.exists(cache_file)
     ppmi.quit()
 
 
-@pytest.mark.flaky(reruns=3, reruns_delay=5)
-def test_download_metadata(remote):
+def test_download_metadata(remote, no_headless):
     """Download 3 random files from PPMI."""
+    headless = not no_headless
     ppmi = PPMIDownloader(remote=remote, tempdir='.',  headless=headless)
     with open(ppmi.file_ids_path, 'r', encoding='utf-8') as fin:
         file_id = json.load(fin)
@@ -80,15 +84,15 @@ def test_download_metadata(remote):
     ppmi.quit()
 
 
-@ pytest.mark.flaky(reruns=3, reruns_delay=5)
-def test_download_3D_T1_info(remote):
+def test_download_3D_T1_info(remote, no_headless):
+    headless = not no_headless
     ppmi = PPMIDownloader(remote=remote, tempdir='.',  headless=headless)
     ppmi.download_3D_T1_info()
     ppmi.quit()
 
 
-@ pytest.mark.flaky(reruns=3, reruns_delay=5)
-def test_download_imaging_data(remote):
+def test_download_imaging_data(remote, no_headless):
+    headless = not no_headless
     ids = [3001, 3003, 3011]
     ppmi = PPMIDownloader(remote=remote, tempdir='.',  headless=headless)
     ppmi.download_imaging_data(ids)
