@@ -13,7 +13,7 @@ import xml.etree.ElementTree as ET
 from configparser import ConfigParser
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, Sequence
 
 import tqdm
 from bs4 import BeautifulSoup
@@ -22,6 +22,7 @@ from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
 from webdriver_manager.chrome import ChromeDriverManager
+from packaging import version
 
 import ppmi_downloader.ppmi_logger as logger
 from ppmi_downloader.ppmi_navigator import (
@@ -77,17 +78,24 @@ def get_driver(headless: bool, tempdir: str, remote: Optional[str] = None):
     WebDriver
     """
     # Create Chrome webdriver
+    manager = ChromeDriverManager()
     options = webdriver.ChromeOptions()
     prefs = {
         "download.default_directory": tempdir,
         "download.prompt_for_download": False,
     }
+
     options.add_experimental_option("prefs", prefs)
     if headless:
-        options.add_argument("--headless")
+        # https://www.selenium.dev/blog/2023/headless-is-going-away/
+        if version.parse(manager.driver.get_browser_version()) < version.parse('109'):
+            options.add_argument("--headless")
+        else:
+            options.add_argument("--headless=new")
+
     if remote is None:
         driver = webdriver.Chrome(
-            ChromeDriverManager().install(), chrome_options=options
+            ChromeDriverManager().install(), options=options
         )
     else:
         if remote == "hostname":
@@ -95,14 +103,13 @@ def get_driver(headless: bool, tempdir: str, remote: Optional[str] = None):
 
         options.add_argument("--ignore-ssl-errors=yes")
         options.add_argument("--ignore-certificate-errors")
-        options.add_argument("--headless")
         driver = None
         with timeout_manager(30):
             driver = webdriver.Remote(remote, options=options)
         if driver is None:
             logger.error("Unable to reach Remote selenium webdriver")
 
-    driver.set_window_size(1200, 720)
+    driver.set_window_size(1920, 1080)
     driver.maximize_window()
     return driver
 
@@ -149,7 +156,8 @@ class PPMIDownloader:
         if self.remote is None:
             self.remote = os.getenv("PPMI_SINGULARITY_SELENIUM_REMOTE")
         self.__set_credentials(config_file)
-        self.tempdir = tempfile.TemporaryDirectory(dir=os.path.abspath(tempdir))
+        self.tempdir = tempfile.TemporaryDirectory(
+            dir=os.path.abspath(tempdir))
         self.driver = get_driver(
             headless=headless, tempdir=self.tempdir.name, remote=self.remote
         )
@@ -161,7 +169,8 @@ class PPMIDownloader:
         self._get_real_name()
 
         # Ids of the download checkboxes in the PPMI metadata download page
-        self.file_ids_path = Path(__file__).parent.joinpath(self.file_ids_default_path)
+        self.file_ids_path = Path(__file__).parent.joinpath(
+            self.file_ids_default_path)
         if not self.file_ids_path.exists():
             self.crawl_study_data(cache_file=self.file_ids_path)
 
@@ -246,9 +255,10 @@ class PPMIDownloader:
 
         with open(cache_file, "r", encoding="utf-8") as fi:
             self.guessed_to_real = json.load(fi)
-            self.real_to_guessed = {v: k for k, v in self.guessed_to_real.items()}
+            self.real_to_guessed = {v: k for k,
+                                    v in self.guessed_to_real.items()}
 
-    def init_and_log(self, headless: bool = True) -> None:
+    def init_and_log(self) -> None:
         """
         Initialize a driver, a ppmi navigator
         and login to ppmi portal
@@ -267,19 +277,19 @@ class PPMIDownloader:
                 if (href := checkbox.findNext()) is not None:
                     name = href.text
                     if name == "" or name is None:
-                        logger.warning(f"Found checkbox with no name {checkbox}")
+                        logger.warning(
+                            f"Found checkbox with no name {checkbox}")
                     else:
                         label_to_checkboxes_id[name.strip()] = checkbox_id
         return label_to_checkboxes_id
 
     def crawl_study_data(
-        self, cache_file: str = "study_data_to_checkbox_id.json", headless: bool = True
-    ):
+            self, cache_file: str = "study_data_to_checkbox_id.json"):
         """
         Creates a mapping between Study data checkbox's name
         and their corresponding checkbox id
         """
-        self.init_and_log(headless=headless)
+        self.init_and_log()
         self.html.click_button_chain(["Download", "Study Data", "ALL"])
         soup = BeautifulSoup(self.driver.page_source, features="lxml")
         study_name_to_checkbox = self.crawl_checkboxes_id(soup)
@@ -299,23 +309,19 @@ class PPMIDownloader:
         with open(cache_file, "w", encoding="utf-8") as fo:
             json.dump(study_name_to_checkbox_clean, fo, indent=0)
 
-        # self.driver.close()
-
     def crawl_advanced_search(
-        self, cache_file: str = "search_to_checkbox_id.json", headless: bool = True
-    ):
+            self, cache_file: str = "search_to_checkbox_id.json"):
         """
         Creates a mapping between Advances Search checkboxe's name
         and their corresponding checkbox id
         """
-        self.init_and_log(headless=headless)
-        self.html.click_button_chain(["Search", "Advanced Image Search (beta)"])
+        self.init_and_log()
+        self.html.click_button_chain(
+            ["Search", "Advanced Image Search (beta)"])
         soup = BeautifulSoup(self.driver.page_source, features="lxml")
         criteria_name_to_checkbox_id = self.crawl_checkboxes_id(soup)
         with open(cache_file, "w", encoding="utf-8") as fo:
             json.dump(criteria_name_to_checkbox_id, fo, indent=0)
-
-        # self.driver.close()
 
     def download_imaging_data(
         self,
@@ -358,7 +364,8 @@ class PPMIDownloader:
         self.driver.get(ppmi_home_webpage)
         # click on 'Search'
         # Click on 'Advanced Image Search (beta)'
-        self.html.click_button_chain(["Search", "Advanced Image Search (beta)"])
+        self.html.click_button_chain(
+            ["Search", "Advanced Image Search (beta)"])
 
         # Enter id's and add to collection
         self.html.enter_data("subjectIdText", subjectIds, By.ID)
@@ -395,20 +402,17 @@ class PPMIDownloader:
                     size = os.stat(filename).st_size
                     logger.debug("Size", size)
                     return False
-            assert f.endswith((".csv", ".zip", ".dcm", ".xml")), f
+            # assert f.endswith((".csv", ".zip", ".dcm", ".xml")), f
             return True
 
         try:
-            WebDriverWait(self.driver, timeout).until(download_complete)
+            WebDriverWait(self.driver, timeout, poll_frequency=5).until(
+                download_complete)
         except TimeoutException:
             self.quit()
             logger.error("Timeout when downloading imaging data", subject_ids)
         # Move file to cwd or extract zip file
         downloaded_files = os.listdir(self.tempdir.name)
-
-        # we got imaging data and metadata
-        if len(downloaded_files) != 3:
-            raise fileMatchingError(f"Found {len(downloaded_files)} while 3 was expected: {downloaded_files}\n")
 
         # unzip files
         self.html.unzip_imaging_data(
@@ -436,10 +440,12 @@ class PPMIDownloader:
 
         # navigate to metadata page
         self.driver.get(ppmi_home_webpage)
-        self.html.click_button_chain(["Search", "Advanced Image Search (beta)"])
+        self.html.click_button_chain(
+            ["Search", "Advanced Image Search (beta)"])
 
         # Click 3D checkbox
-        self.html.click_button("imgProtocol_checkBox1.Acquisition_Type.3D", By.ID)
+        self.html.click_button(
+            "imgProtocol_checkBox1.Acquisition_Type.3D", By.ID)
         # Click checkbox to display visit name in results
         self.html.click_button("RESET_VISIT.0", By.ID)
         # Click checkbox to display weighting in results
@@ -447,7 +453,8 @@ class PPMIDownloader:
         # Click checkbox to display manufacturer in results
         self.html.click_button("RESET_PROTOCOL_STRING.1_Manufacturer", By.ID)
         # Click checkbox to display slice thickness in results
-        self.html.click_button("RESET_PROTOCOL_NUMERIC.imgProtocol_1_Slice_Thickness", By.ID)
+        self.html.click_button(
+            "RESET_PROTOCOL_NUMERIC.imgProtocol_1_Slice_Thickness", By.ID)
         # Click checkbox to display manufacturer model in results
         self.html.click_button("RESET_PROTOCOL_STRING.1_Mfg_Model", By.ID)
         # Click checkbox to display study date in results
@@ -457,7 +464,8 @@ class PPMIDownloader:
             "RESET_PROTOCOL_NUMERIC.imgProtocol_1_Field_Strength", By.ID
         )
         # Click checkbox to display acquisition plane in results
-        self.html.click_button("RESET_PROTOCOL_STRING.1_Acquisition_Plane", By.ID)
+        self.html.click_button(
+            "RESET_PROTOCOL_STRING.1_Acquisition_Plane", By.ID)
 
         # Click search button
         self.html.click_button("advSearchQuery", By.ID)
@@ -478,24 +486,26 @@ class PPMIDownloader:
                     return False
                 if f.endswith(".csv"):
                     return True
-            assert f.endswith(".csv"), f"file ends with: {f}"
+            # assert f.endswith(".csv"), f"file ends with: {f}"
             return True
 
         try:
-            WebDriverWait(self.driver, timeout).until(download_complete)
+            WebDriverWait(self.driver, timeout, poll_frequency=5).until(
+                download_complete)
         except TimeoutException:
             self.quit()
             logger.error("Unable to download T1 3D information")
 
         # Move file to cwd or extract zip file
-        file_name = self.html.unzip_metadata(self.tempdir.name, destination_dir)
+        file_name = self.html.unzip_metadata(
+            self.tempdir.name, destination_dir)
 
         return file_name
 
     def download_metadata(
         self,
         file_ids: str | List[str],
-        timeout: float = 120,
+        timeout: float = 600,
         destination_dir: str = ".",
     ) -> None:
         """
@@ -514,7 +524,8 @@ class PPMIDownloader:
         if not isinstance(file_ids, list):
             file_ids = [file_ids]
 
-        supported_files = set(self.file_ids.keys()) | set(self.real_to_guessed.keys())
+        supported_files = set(self.file_ids.keys()) | set(
+            self.real_to_guessed.keys())
         for file_name in tqdm.tqdm(file_ids):
             if file_name not in supported_files:
                 raise Exception(
@@ -539,7 +550,9 @@ class PPMIDownloader:
                 guess = self.real_to_guessed[file_name]
                 checkbox_id = self.file_ids.get(guess)
             for checkbox in self.driver.find_elements(By.ID, checkbox_id)[0:2]:
+                logger.debug('Click checkbox', checkbox_id, file_name)
                 checkbox.click()
+
         self.html.click_button("downloadBtn", By.ID)
 
         # Wait for download to complete
@@ -554,11 +567,12 @@ class PPMIDownloader:
                     size = os.stat(filename).st_size
                     logger.debug("Size", size)
                     return False
-            assert f.endswith((".csv", ".zip")), f"file ends with: {f}"
+            # assert f.endswith((".csv", ".zip")), f"file ends with: {f}"
             return True
 
         try:
-            WebDriverWait(self.driver, timeout).until(download_complete)
+            WebDriverWait(self.driver, timeout, poll_frequency=5).until(
+                download_complete)
         except TimeoutException as e:
             self.quit()
             raise e
@@ -667,7 +681,8 @@ class PPMINiftiFileFinder:
                 if child.tag == "visit":
                     visit_id = parse_visit(child)
                 if child.tag == "study":
-                    study_id, series_id, image_id, description = parse_study(child)
+                    study_id, series_id, image_id, description = parse_study(
+                        child)
             assert None not in (
                 subject_id,
                 visit_id,
