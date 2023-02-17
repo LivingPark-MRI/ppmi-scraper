@@ -68,7 +68,7 @@ def test_crawl_advanced_search(remote):
 @pytest.mark.flaky(reruns=3, reruns_delay=5)
 def test_download_metadata(remote):
     """Download 3 random files from PPMI."""
-    ppmi = PPMIDownloader(remote=remote, tempdir='.')
+    ppmi = PPMIDownloader(remote=remote, tempdir='.',  headless=headless)
     with open(ppmi.file_ids_path, 'r', encoding='utf-8') as fin:
         file_id = json.load(fin)
     filenames = file_id.keys()
@@ -76,21 +76,21 @@ def test_download_metadata(remote):
                         'Data_Dictionary_-__Annotated_.csv',
                         'SCOPA-AUT.csv']
     random_names = random.sample(filenames, min(3, len(filenames)))
-    ppmi.download_metadata(mismatched_names + random_names, headless=headless)
+    ppmi.download_metadata(mismatched_names + random_names)
     ppmi.quit()
 
 
 @ pytest.mark.flaky(reruns=3, reruns_delay=5)
 def test_download_3D_T1_info(remote):
-    ppmi = PPMIDownloader(remote=remote, tempdir='.')
-    ppmi.download_3D_T1_info(headless=headless)
+    ppmi = PPMIDownloader(remote=remote, tempdir='.',  headless=headless)
+    ppmi.download_3D_T1_info()
     ppmi.quit()
 
 
 @ pytest.mark.flaky(reruns=3, reruns_delay=5)
 def test_download_imaging_data(remote):
     ids = [3001, 3003, 3011]
-    ppmi = PPMIDownloader(remote=remote, tempdir='.')
-    ppmi.download_imaging_data(ids, headless=headless)
-    ppmi.download_imaging_data(ids, type="nifti", headless=headless)
+    ppmi = PPMIDownloader(remote=remote, tempdir='.',  headless=headless)
+    ppmi.download_imaging_data(ids)
+    ppmi.download_imaging_data(ids, type="nifti")
     ppmi.quit()
