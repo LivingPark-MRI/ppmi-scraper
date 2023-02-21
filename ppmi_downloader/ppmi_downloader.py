@@ -542,7 +542,7 @@ class PPMIDownloader:
                 guess = self.real_to_guessed[file_name]
                 checkbox_id = self.file_ids.get(guess)
             for checkbox in self.driver.find_elements(By.ID, checkbox_id)[0:2]:
-                logger.debug('Click checkbox', checkbox, file_name)
+                logger.debug('Click checkbox', checkbox_id, file_name)
                 checkbox.click()
 
         self.html.click_button("downloadBtn", By.ID)
