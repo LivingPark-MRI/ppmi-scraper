@@ -440,6 +440,8 @@ class PPMIDownloader:
         self.html.click_button("RESET_PROTOCOL_STRING.1_Weighting", By.ID)
         # Click checkbox to display manufacturer in results
         self.html.click_button("RESET_PROTOCOL_STRING.1_Manufacturer", By.ID)
+        # Click checkbox to display slice thickness in results
+        self.html.click_button("RESET_PROTOCOL_NUMERIC.imgProtocol_1_Slice_Thickness", By.ID)
         # Click checkbox to display manufacturer model in results
         self.html.click_button("RESET_PROTOCOL_STRING.1_Mfg_Model", By.ID)
         # Click checkbox to display study date in results
