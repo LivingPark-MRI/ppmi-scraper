@@ -3,6 +3,7 @@ import glob
 import json
 import os
 import os.path as op
+from pathlib import Path
 import pkg_resources
 import signal
 import socket
@@ -28,6 +29,10 @@ from ppmi_downloader.ppmi_navigator import (
     ppmi_home_webpage,
     ppmi_main_webpage,
 )
+
+
+class fileMatchingError(Exception):
+    pass
 
 
 def get_ip_hostname():
@@ -402,7 +407,8 @@ class PPMIDownloader:
         downloaded_files = os.listdir(self.tempdir.name)
 
         # we got imaging data and metadata
-        assert len(downloaded_files) == 3
+        if len(downloaded_files) != 3:
+            raise fileMatchingError(f"Found {len(downloaded_files)} while 3 was expected: {downloaded_files}\n")
 
         # unzip files
         self.html.unzip_imaging_data(
@@ -573,10 +579,26 @@ class PPMINiftiFileFinder:
         self.visit_map = {
             "SC": "Screening",
             "BL": "Baseline",
+            "V01": "Month 3",
+            "V02": "Month 6",
+            "V03": "Month 9",
             "V04": "Month 12",
+            "V05": "Month 18",
             "V06": "Month 24",
+            "V07": "Month 30",
             "V08": "Month 36",
+            "V09": "Month 42",
             "V10": "Month 48",
+            "V11": "Month 54",
+            "V12": "Month 60",
+            "V13": "Month 72",
+            "V14": "Month 84",
+            "V15": "Month 96",
+            "V16": "Month 108",
+            "V17": "Month 120",
+            "V18": "Month 132",
+            "V19": "Month 144",
+            "V20": "Month 156",
             "ST": "Symptomatic Therapy",
             "U01": "Unscheduled Visit 01",
             "U02": "Unscheduled Visit 02",
@@ -711,20 +733,17 @@ class PPMINiftiFileFinder:
                 and (self.visit_map[event_id] == visit_id)
                 and (description == descr)
             ):
-                expression = op.join(
-                    self.download_dir,
-                    subject_id,
-                    clean_desc(description),
-                    "*",
-                    f"S{series_id}",
-                    f"PPMI_{subject_id}_MR_*_S{series_id}_I{image_id}.nii",
-                )
-                files = glob.glob(expression)
-                assert (
-                    len(files) == 1
-                ), f"Found {len(files)} files matching {expression} while exactly 1 was expected"
+                subject_dir = Path(self.download_dir, subject_id)
+                expression = f"**/PPMI_{subject_id}_MR_*_S{series_id}_I{image_id}.nii"
+                files = [
+                    filename
+                    for filename in subject_dir.glob(expression)
+                ]
+                if len(files) != 1:
+                    raise fileMatchingError(
+                        f"Found {len(files)} files matching {subject_dir / expression} while exactly 1 was expected\n"
+                    )
                 file_name = files[0]
-                assert op.exists(file_name), "This should never happen :)"
                 return file_name
             # else:
             #     print(f'File {xml_file} is for {(s_id, visit_id, study_id, series_id, image_id, descr)} while we are looking for {subject_id, self.visit_map[event_id], description}')
