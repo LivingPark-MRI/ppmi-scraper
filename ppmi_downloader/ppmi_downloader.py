@@ -456,6 +456,10 @@ class PPMIDownloader:
         self.html.click_button(
             "RESET_PROTOCOL_NUMERIC.imgProtocol_1_Field_Strength", By.ID
         )
+        # Click checkbox to display image ID in results
+        self.html.click_button(
+            "RESET_MODALITY.1", By.ID
+        )
         # Click checkbox to display acquisition plane in results
         self.html.click_button("RESET_PROTOCOL_STRING.1_Acquisition_Plane", By.ID)
 
