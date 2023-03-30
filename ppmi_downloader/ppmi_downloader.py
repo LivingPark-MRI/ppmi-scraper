@@ -408,16 +408,16 @@ class PPMIDownloader:
 
         # we got imaging data and metadata
         if len(downloaded_files) != 3:
-            raise fileMatchingError(f"Found {len(downloaded_files)} while 3 was expected: {downloaded_files}\n")
+            raise fileMatchingError(
+                f"Found {len(downloaded_files)} while 3 was expected: {downloaded_files}\n"
+            )
 
         # unzip files
         self.html.unzip_imaging_data(
             downloaded_files, self.tempdir.name, destination_dir
         )
 
-    def download_3D_T1_info(
-        self, timeout: float = 120, destination_dir: str = "."
-    ):
+    def download_3D_T1_info(self, timeout: float = 120, destination_dir: str = "."):
         r"""Download csv file containing information about available 3D MRIs
 
         Parameters
@@ -447,7 +447,9 @@ class PPMIDownloader:
         # Click checkbox to display manufacturer in results
         self.html.click_button("RESET_PROTOCOL_STRING.1_Manufacturer", By.ID)
         # Click checkbox to display slice thickness in results
-        self.html.click_button("RESET_PROTOCOL_NUMERIC.imgProtocol_1_Slice_Thickness", By.ID)
+        self.html.click_button(
+            "RESET_PROTOCOL_NUMERIC.imgProtocol_1_Slice_Thickness", By.ID
+        )
         # Click checkbox to display manufacturer model in results
         self.html.click_button("RESET_PROTOCOL_STRING.1_Mfg_Model", By.ID)
         # Click checkbox to display study date in results
@@ -457,9 +459,7 @@ class PPMIDownloader:
             "RESET_PROTOCOL_NUMERIC.imgProtocol_1_Field_Strength", By.ID
         )
         # Click checkbox to display image ID in results
-        self.html.click_button(
-            "RESET_MODALITY.1", By.ID
-        )
+        self.html.click_button("RESET_MODALITY.1", By.ID)
         # Click checkbox to display acquisition plane in results
         self.html.click_button("RESET_PROTOCOL_STRING.1_Acquisition_Plane", By.ID)
 
@@ -521,9 +521,7 @@ class PPMIDownloader:
         supported_files = set(self.file_ids.keys()) | set(self.real_to_guessed.keys())
         for file_name in tqdm.tqdm(file_ids):
             if file_name not in supported_files:
-                raise Exception(
-                    f"Unsupported file name: {file_name}."
-                )
+                raise Exception(f"Unsupported file name: {file_name}.")
 
         # Login to PPMI
         self.driver.get(ppmi_main_webpage)
@@ -739,10 +737,7 @@ class PPMINiftiFileFinder:
             ):
                 subject_dir = Path(self.download_dir, subject_id)
                 expression = f"**/PPMI_{subject_id}_MR_*_S{series_id}_I{image_id}.nii"
-                files = [
-                    filename
-                    for filename in subject_dir.glob(expression)
-                ]
+                files = [filename for filename in subject_dir.glob(expression)]
                 if len(files) != 1:
                     raise fileMatchingError(
                         f"Found {len(files)} files matching {subject_dir / expression} while exactly 1 was expected\n"
