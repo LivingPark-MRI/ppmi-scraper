@@ -12,7 +12,7 @@ import xml.etree.ElementTree as ET
 from configparser import ConfigParser
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, Sequence
 
 import tqdm
 from bs4 import BeautifulSoup
@@ -400,7 +400,8 @@ class PPMIDownloader:
             return True
 
         try:
-            WebDriverWait(self.driver, timeout).until(download_complete)
+            WebDriverWait(self.driver, timeout, poll_frequency=5).until(
+                download_complete)
         except TimeoutException:
             self.quit()
             logger.error("Timeout when downloading imaging data", subject_ids)
@@ -483,7 +484,8 @@ class PPMIDownloader:
             return True
 
         try:
-            WebDriverWait(self.driver, timeout).until(download_complete)
+            WebDriverWait(self.driver, timeout, poll_frequency=5).until(
+                download_complete)
         except TimeoutException:
             self.quit()
             logger.error("Unable to download T1 3D information")
@@ -563,7 +565,8 @@ class PPMIDownloader:
             return True
 
         try:
-            WebDriverWait(self.driver, timeout).until(download_complete)
+            WebDriverWait(self.driver, timeout, poll_frequency=5).until(
+                download_complete)
         except TimeoutException as e:
             self.quit()
             raise e
