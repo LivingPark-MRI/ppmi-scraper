@@ -374,11 +374,20 @@ class HTMLHelper:
             Name of the directory where to copy files
 
         '''
-        # Move file to cwd or extract zip file
-        downloaded_files = os.listdir(source_dir)
-        # we got either a csv or a zip file
-        assert len(downloaded_files) == 1
-        file_name = downloaded_files[0]
+        i = 0
+        is_metadata_ext = False
+        # Do check since sometimes we still have the temporary name
+        # used during downloading
+        while not is_metadata_ext and i < 10:
+            # Move file to cwd or extract zip file
+            downloaded_files = os.listdir(source_dir)
+            # we got either a csv or a zip file
+            assert len(downloaded_files) == 1
+            file_name = downloaded_files[0]
+            is_metadata_ext = file_name.endswith((".zip", ".csv"))
+            time.sleep(.5)
+            i += 1
+
         assert file_name.endswith((".zip", ".csv"))
         self.unzip_file(file_name, source_dir, destination_dir)
         return file_name

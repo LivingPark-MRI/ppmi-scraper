@@ -82,7 +82,7 @@ def get_driver(headless: bool, tempdir: str, remote: Optional[str] = None):
         options.add_argument("--headless")
     if remote is None:
         driver = webdriver.Chrome(
-            ChromeDriverManager().install(), chrome_options=options
+            ChromeDriverManager().install(), options=options
         )
     else:
         if remote == "hostname":
@@ -246,7 +246,7 @@ class PPMIDownloader:
             self.real_to_guessed = {v: k for k,
                                     v in self.guessed_to_real.items()}
 
-    def init_and_log(self, headless: bool = True) -> None:
+    def init_and_log(self) -> None:
         """
         Initialize a driver, a ppmi navigator
         and login to ppmi portal
@@ -272,13 +272,12 @@ class PPMIDownloader:
         return label_to_checkboxes_id
 
     def crawl_study_data(
-        self, cache_file: str = "study_data_to_checkbox_id.json", headless: bool = True
-    ):
+            self, cache_file: str = "study_data_to_checkbox_id.json"):
         """
         Creates a mapping between Study data checkbox's name
         and their corresponding checkbox id
         """
-        self.init_and_log(headless=headless)
+        self.init_and_log()
         self.html.click_button_chain(["Download", "Study Data", "ALL"])
         soup = BeautifulSoup(self.driver.page_source, features="lxml")
         study_name_to_checkbox = self.crawl_checkboxes_id(soup)
@@ -298,24 +297,19 @@ class PPMIDownloader:
         with open(cache_file, "w", encoding="utf-8") as fo:
             json.dump(study_name_to_checkbox_clean, fo, indent=0)
 
-        # self.driver.close()
-
     def crawl_advanced_search(
-        self, cache_file: str = "search_to_checkbox_id.json", headless: bool = True
-    ):
+            self, cache_file: str = "search_to_checkbox_id.json"):
         """
         Creates a mapping between Advances Search checkboxe's name
         and their corresponding checkbox id
         """
-        self.init_and_log(headless=headless)
+        self.init_and_log()
         self.html.click_button_chain(
             ["Search", "Advanced Image Search (beta)"])
         soup = BeautifulSoup(self.driver.page_source, features="lxml")
         criteria_name_to_checkbox_id = self.crawl_checkboxes_id(soup)
         with open(cache_file, "w", encoding="utf-8") as fo:
             json.dump(criteria_name_to_checkbox_id, fo, indent=0)
-
-        # self.driver.close()
 
     def download_imaging_data(
         self,
@@ -396,7 +390,7 @@ class PPMIDownloader:
                     size = os.stat(filename).st_size
                     logger.debug("Size", size)
                     return False
-            assert f.endswith((".csv", ".zip", ".dcm", ".xml")), f
+            # assert f.endswith((".csv", ".zip", ".dcm", ".xml")), f
             return True
 
         try:
@@ -407,9 +401,6 @@ class PPMIDownloader:
             logger.error("Timeout when downloading imaging data", subject_ids)
         # Move file to cwd or extract zip file
         downloaded_files = os.listdir(self.tempdir.name)
-
-        # we got imaging data and metadata
-        assert len(downloaded_files) == 3
 
         # unzip files
         self.html.unzip_imaging_data(
@@ -480,7 +471,7 @@ class PPMIDownloader:
                     return False
                 if f.endswith(".csv"):
                     return True
-            assert f.endswith(".csv"), f"file ends with: {f}"
+            # assert f.endswith(".csv"), f"file ends with: {f}"
             return True
 
         try:
@@ -561,7 +552,7 @@ class PPMIDownloader:
                     size = os.stat(filename).st_size
                     logger.debug("Size", size)
                     return False
-            assert f.endswith((".csv", ".zip")), f"file ends with: {f}"
+            # assert f.endswith((".csv", ".zip")), f"file ends with: {f}"
             return True
 
         try:
