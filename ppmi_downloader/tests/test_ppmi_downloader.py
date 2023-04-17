@@ -36,6 +36,14 @@ def test_ppmi_failing_login(remote, no_headless):
     ppmi_wrong.quit()
 
 
+def test_ppmi_double_login(remote, no_headless):
+    headless = not no_headless
+    ppmi = PPMIDownloader(remote=remote, headless=headless)
+    ppmi.init_and_log()
+    ppmi.init_and_log()
+    ppmi.quit()
+
+
 def test_hamburger_menu(remote, no_headless):
     '''
     Test Download is correctly clicked when
