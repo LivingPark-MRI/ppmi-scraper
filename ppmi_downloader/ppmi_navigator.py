@@ -1,3 +1,4 @@
+import json
 import os
 import os.path as op
 import shutil
@@ -56,13 +57,17 @@ class HTMLHelper:
         function : str
             Name of the function
         '''
-        self.driver.get_screenshot_as_file(
-            f'error-{function}-{time.time_ns()}.png')
+        time_ns = time.time_ns()
+        filename = f'error-{function}-{time_ns}'
+        with open(f'{filename}.json', 'w') as fo:
+            json.dump(self.driver.desired_capabilities, fo)
+        self.driver.get_screenshot_as_file(f'{filename}.png')
 
     def wait_for_element_to_be_visible(self, field: str,
                                        BY: By = By.XPATH,
                                        timeout: float = TIMEOUT,
-                                       debug_name: str = '') -> WebElement:
+                                       debug_name: str = '',
+                                       raise_exception: bool = False) -> WebElement:
         r'''Wait for element to be visible
 
         Parameters
@@ -83,11 +88,25 @@ class HTMLHelper:
             An Exception is raised by WebDriverWait if not
 
         '''
-        logger.debug('Wait for element to be visible', field, BY, debug_name)
-        predicate = EC.visibility_of_element_located((BY, field))
-        element = WebDriverWait(self.driver, timeout,
-                                poll_frequency=1).until(predicate)
-        return element
+        try:
+            logger.debug('Wait for element to be visible',
+                         field, BY, debug_name)
+            predicate = EC.visibility_of_element_located((BY, field))
+            element = WebDriverWait(self.driver, timeout,
+                                    poll_frequency=1).until(predicate)
+            return element
+        except TimeoutException as e:
+            if raise_exception:
+                raise e
+            self.take_screenshot('wait_for_element_visible')
+            self.driver.quit()
+            logger.error('wait for element to be visible times out')
+        except Exception as e:
+            if raise_exception:
+                raise e
+            self.take_screenshot('wait_for_element_visible')
+            self.driver.quit()
+            logger.error(f'Unknown exception {e}')
 
     def enter_data(self, field: str,
                    data: str,
@@ -314,8 +333,9 @@ class HTMLHelper:
         self.validate_cookie_policy()
         self.driver.get(ppmi_login_webpage)
         try:
-            self.wait_for_element_to_be_visible(
-                'ida-user-username', BY=By.CLASS_NAME)
+            self.wait_for_element_to_be_visible('ida-menu-option.sub-menu.user',
+                                                BY=By.CLASS_NAME,
+                                                raise_exception=True)
             logger.debug('Already logged in')
             return
         except (NoSuchElementException, TimeoutException):
@@ -330,8 +350,8 @@ class HTMLHelper:
         self.click_button("button", By.TAG_NAME, debug_name='Login button')
 
         try:
-            self.driver.find_element(
-                By.CLASS_NAME, 'register-input-error-msg.invalid-login')
+            self.driver.find_element(By.CLASS_NAME,
+                                     'register-input-error-msg.invalid-login')
             logger.error('Login Failed')
         except NoSuchElementException:
             logger.info('Login Successful')
