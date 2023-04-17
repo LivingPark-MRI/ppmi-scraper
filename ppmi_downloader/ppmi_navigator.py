@@ -545,6 +545,19 @@ class PPMINavigator(HTMLHelper):
                               BY=By.CLASS_NAME,
                               debug_name='Download Hamburger submenu')
 
+    def HamburgerMenu_Search(self) -> None:
+        r'''Action to click on "Download" in HamburgerMenu
+
+        Click on button until postcondition is not met
+        '''
+        def postcondition() -> bool:
+            return self.is_element_active('ida-menu-option.sub-menu.search')
+
+        while not postcondition():
+            self.click_button('ida-menu-option.sub-menu.search',
+                              BY=By.CLASS_NAME,
+                              debug_name='Search Hamburger submenu')
+
     def Download(self) -> None:
         r'''Action to click on "Download"
 
@@ -622,6 +635,10 @@ class PPMINavigator(HTMLHelper):
 
         Click on button until postcondition is not met
         '''
+        if self.has_HamburgerMenu():
+            self.HamburgerMenu()
+            self.HamburgerMenu_Search()
+
         def postcondition() -> bool:
             try:
                 name = 'ida-menu-option.sub-menu.search.active'

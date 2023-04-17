@@ -92,6 +92,7 @@ def get_driver(headless: bool, tempdir: str, remote: Optional[str] = None):
             options.add_argument("--headless")
         else:
             options.add_argument("--headless=new")
+        options.add_argument("--window-size=1920,1080")
 
     if remote is None:
         driver = webdriver.Chrome(
@@ -109,7 +110,6 @@ def get_driver(headless: bool, tempdir: str, remote: Optional[str] = None):
         if driver is None:
             logger.error("Unable to reach Remote selenium webdriver")
 
-    driver.set_window_size(1920, 1080)
     driver.maximize_window()
     return driver
 
@@ -163,6 +163,7 @@ class PPMIDownloader:
         )
         self.html = PPMINavigator(self.driver)
 
+        logger.debug(self.driver.desired_capabilities)
         logger.debug(self.tempdir)
 
         # Load real metadata names
