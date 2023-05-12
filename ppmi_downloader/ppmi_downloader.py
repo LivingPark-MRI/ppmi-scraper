@@ -87,11 +87,16 @@ def get_driver(headless: bool, tempdir: str, remote: Optional[str] = None):
 
     options.add_experimental_option("prefs", prefs)
     if headless:
-        # https://www.selenium.dev/blog/2023/headless-is-going-away/
-        if version.parse(manager.driver.get_browser_version()) < version.parse('109'):
+        try:
+            # https://www.selenium.dev/blog/2023/headless-is-going-away/
+            if version.parse(manager.driver.get_browser_version()) < version.parse('109'):
+                options.add_argument("--headless")
+            else:
+                options.add_argument("--headless=new")
+        except:
+            # `manager.driver.get_browser_version()` sometimes fails.
+            # In that case, assume version prior to 109.
             options.add_argument("--headless")
-        else:
-            options.add_argument("--headless=new")
         options.add_argument("--window-size=1920,1080")
 
     if remote is None:
