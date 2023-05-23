@@ -1,3 +1,4 @@
+import json
 import os
 import os.path as op
 import shutil
@@ -56,13 +57,17 @@ class HTMLHelper:
         function : str
             Name of the function
         '''
-        self.driver.get_screenshot_as_file(
-            f'error-{function}-{time.time_ns()}.png')
+        time_ns = time.time_ns()
+        filename = f'error-{function}-{time_ns}'
+        with open(f'{filename}.json', 'w') as fo:
+            json.dump(self.driver.desired_capabilities, fo)
+        self.driver.get_screenshot_as_file(f'{filename}.png')
 
     def wait_for_element_to_be_visible(self, field: str,
                                        BY: By = By.XPATH,
                                        timeout: float = TIMEOUT,
-                                       debug_name: str = '') -> WebElement:
+                                       debug_name: str = '',
+                                       raise_exception: bool = False) -> WebElement:
         r'''Wait for element to be visible
 
         Parameters
@@ -83,11 +88,25 @@ class HTMLHelper:
             An Exception is raised by WebDriverWait if not
 
         '''
-        logger.debug('Wait for element to be visible', field, BY, debug_name)
-        predicate = EC.visibility_of_element_located((BY, field))
-        element = WebDriverWait(self.driver, timeout,
-                                poll_frequency=1).until(predicate)
-        return element
+        try:
+            logger.debug('Wait for element to be visible',
+                         field, BY, debug_name)
+            predicate = EC.visibility_of_element_located((BY, field))
+            element = WebDriverWait(self.driver, timeout,
+                                    poll_frequency=1).until(predicate)
+            return element
+        except TimeoutException as e:
+            if raise_exception:
+                raise e
+            self.take_screenshot('wait_for_element_visible')
+            self.driver.quit()
+            logger.error('wait for element to be visible times out')
+        except Exception as e:
+            if raise_exception:
+                raise e
+            self.take_screenshot('wait_for_element_visible')
+            self.driver.quit()
+            logger.error(f'Unknown exception {e}')
 
     def enter_data(self, field: str,
                    data: str,
@@ -314,8 +333,9 @@ class HTMLHelper:
         self.validate_cookie_policy()
         self.driver.get(ppmi_login_webpage)
         try:
-            self.wait_for_element_to_be_visible(
-                'ida-user-username', BY=By.CLASS_NAME)
+            self.wait_for_element_to_be_visible('ida-menu-option.sub-menu.user',
+                                                BY=By.CLASS_NAME,
+                                                raise_exception=True)
             logger.debug('Already logged in')
             return
         except (NoSuchElementException, TimeoutException):
@@ -330,8 +350,8 @@ class HTMLHelper:
         self.click_button("button", By.TAG_NAME, debug_name='Login button')
 
         try:
-            self.driver.find_element(
-                By.CLASS_NAME, 'register-input-error-msg.invalid-login')
+            self.driver.find_element(By.CLASS_NAME,
+                                     'register-input-error-msg.invalid-login')
             logger.error('Login Failed')
         except NoSuchElementException:
             logger.info('Login Successful')
@@ -374,11 +394,20 @@ class HTMLHelper:
             Name of the directory where to copy files
 
         '''
-        # Move file to cwd or extract zip file
-        downloaded_files = os.listdir(source_dir)
-        # we got either a csv or a zip file
-        assert len(downloaded_files) == 1
-        file_name = downloaded_files[0]
+        i = 0
+        is_metadata_ext = False
+        # Do check since sometimes we still have the temporary name
+        # used during downloading
+        while not is_metadata_ext and i < 10:
+            # Move file to cwd or extract zip file
+            downloaded_files = os.listdir(source_dir)
+            # we got either a csv or a zip file
+            assert len(downloaded_files) == 1
+            file_name = downloaded_files[0]
+            is_metadata_ext = file_name.endswith((".zip", ".csv"))
+            time.sleep(.5)
+            i += 1
+
         assert file_name.endswith((".zip", ".csv"))
         self.unzip_file(file_name, source_dir, destination_dir)
         return file_name
@@ -536,6 +565,19 @@ class PPMINavigator(HTMLHelper):
                               BY=By.CLASS_NAME,
                               debug_name='Download Hamburger submenu')
 
+    def HamburgerMenu_Search(self) -> None:
+        r'''Action to click on "Download" in HamburgerMenu
+
+        Click on button until postcondition is not met
+        '''
+        def postcondition() -> bool:
+            return self.is_element_active('ida-menu-option.sub-menu.search')
+
+        while not postcondition():
+            self.click_button('ida-menu-option.sub-menu.search',
+                              BY=By.CLASS_NAME,
+                              debug_name='Search Hamburger submenu')
+
     def Download(self) -> None:
         r'''Action to click on "Download"
 
@@ -574,7 +616,7 @@ class PPMINavigator(HTMLHelper):
         '''
         studydata_url = 'https://ida.loni.usc.edu/pages/access/studyData.jsp'
         while self.driver.current_url != studydata_url:
-            self.click_button("ygtvlabelel74", BY=By.ID, debug_name='ALL')
+            self.click_button("ygtvlabelel76", BY=By.ID, debug_name='ALL')
 
     def Download_ImageCollections(self) -> None:
         r'''Action to click on "Image Collections" in "Download"
@@ -613,6 +655,10 @@ class PPMINavigator(HTMLHelper):
 
         Click on button until postcondition is not met
         '''
+        if self.has_HamburgerMenu():
+            self.HamburgerMenu()
+            self.HamburgerMenu_Search()
+
         def postcondition() -> bool:
             try:
                 name = 'ida-menu-option.sub-menu.search.active'
