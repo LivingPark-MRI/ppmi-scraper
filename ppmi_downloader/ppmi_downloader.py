@@ -100,8 +100,9 @@ def get_driver(headless: bool, tempdir: str, remote: Optional[str] = None):
         options.add_argument("--window-size=1920,1080")
 
     if remote is None:
+        ChromeDriverManager().install()
         driver = webdriver.Chrome(
-            ChromeDriverManager().install(), options=options
+            options=options
         )
     else:
         if remote == "hostname":
@@ -334,9 +335,10 @@ class PPMIDownloader:
         subject_ids: List[int],
         timeout: float = 600,
         destination_dir: str = ".",
-        type: str = "archived",
     ):
         r"""Download all imaging data files from PPMI. Requires Google Chrome.
+
+        Data is downloaded in the original format; usually DICOM.
 
         Parameters
         ----------
@@ -346,17 +348,7 @@ class PPMIDownloader:
             file download timeout, in seconds
         destination_dir : str
             directory where to store the downloaded files
-        type : str
-            can be 'archived' or 'nifti'. Archived means that the images are
-            downloaded as archived in the PPMI database, which usually means
-            in DICOM format.
-
         """
-        assert type in (
-            "archived",
-            "nifti",
-        ), f'Invalid type: {type}. Only "archived" and "nifti" are supported'
-
         if len(subject_ids) == 0:
             return
 
@@ -386,10 +378,6 @@ class PPMIDownloader:
 
         self.html.click_button("export", By.ID)
         self.html.click_button("selectAllCheckBox", By.ID)
-        if type == "nifti":
-            self.html.click_button("niftiButton", By.ID)
-        elif type == "archived":
-            self.html.click_button("archivedButton", By.ID)
         self.html.click_button("simple-download-button", By.ID)
 
         # Download imaging data and metadata
@@ -585,191 +573,3 @@ class PPMIDownloader:
 
         # Move file to cwd or extract zip file
         self.html.unzip_metadata(self.tempdir.name, destination_dir)
-
-
-class PPMINiftiFileFinder:
-    """
-    A class to find a Nifti file by subject ID, visit ID and protocol description
-    from a PPMI image collection. See function find_nifti for detailed usage.
-    """
-
-    def __init__(self, download_dir="PPMI"):
-        self.download_dir = download_dir
-        # Mapping between Study Data Event IDs and imaging visit names
-        self.visit_map = {
-            "SC": "Screening",
-            "BL": "Baseline",
-            "V01": "Month 3",
-            "V02": "Month 6",
-            "V03": "Month 9",
-            "V04": "Month 12",
-            "V05": "Month 18",
-            "V06": "Month 24",
-            "V07": "Month 30",
-            "V08": "Month 36",
-            "V09": "Month 42",
-            "V10": "Month 48",
-            "V11": "Month 54",
-            "V12": "Month 60",
-            "V13": "Month 72",
-            "V14": "Month 84",
-            "V15": "Month 96",
-            "V16": "Month 108",
-            "V17": "Month 120",
-            "V18": "Month 132",
-            "V19": "Month 144",
-            "V20": "Month 156",
-            "ST": "Symptomatic Therapy",
-            "U01": "Unscheduled Visit 01",
-            "U02": "Unscheduled Visit 02",
-            "PW": "Premature Withdrawal",
-        }
-
-    def __parse_xml_metadata(self, xml_file):
-        """
-        Return (subject_id, visit_id, study_id, series_id, image_id, description) from XML metadata file.
-
-        Parameter:
-        * xml_file: PPMI XML image metadata file. Such files come with PPMI image collections.
-
-        Returned values:
-        * subject_id: Subject ID associated with the image.
-        * visit_id: Visit id of the image. Example: "Month 24".
-        * study_id: Study id of the image. Example: 12345.
-        * series_id: Series id of the image. Example: 123456.
-        * image_id: Image id of the image. Example: 123456.
-        * description: Protocol description of the image. Example: "MPRAGE GRAPPA"
-        """
-        tree = ET.parse(xml_file)
-        root = tree.getroot()
-
-        def parse_series(series):
-            assert series.tag == "series", xml_file
-            for child in series:
-                if child.tag == "seriesIdentifier":
-                    return child.text
-
-        def parse_protocol(protocol):
-            assert protocol.tag == "imagingProtocol", xml_file
-            for child in protocol:
-                if child.tag == "imageUID":
-                    image_id = child.text
-                if child.tag == "description":
-                    description = child.text
-            return (image_id, description)
-
-        def parse_study(study):
-            assert study.tag == "study", xml_file
-            for study_child in study:
-                if study_child.tag == "studyIdentifier":
-                    study_id = study_child.text
-                if study_child.tag == "series":
-                    series_id = parse_series(study_child)
-                if study_child.tag == "imagingProtocol":
-                    image_id, description = parse_protocol(study_child)
-            return (study_id, series_id, image_id, description)
-
-        def parse_visit(visit):
-            assert visit.tag == "visit", xml_file
-            for visit_child in visit:
-                if visit_child.tag == "visitIdentifier":
-                    return visit_child.text
-            raise Exception(f"Visit identifier not found in visit {visit}")
-
-        def parse_subject(subject):
-            assert subject.tag == "subject", xml_file
-            subject_id, visit_id, study_id, series_id, image_id, description = (
-                None for x in range(6)
-            )
-            for child in subject:
-                if child.tag == "subjectIdentifier":
-                    subject_id = child.text
-                if child.tag == "visit":
-                    visit_id = parse_visit(child)
-                if child.tag == "study":
-                    study_id, series_id, image_id, description = parse_study(
-                        child)
-            assert None not in (
-                subject_id,
-                visit_id,
-                study_id,
-                series_id,
-                image_id,
-                description,
-            )
-            return (subject_id, visit_id, study_id, series_id, image_id, description)
-
-        for project in root:
-            if project.tag == "project":
-                for child in project:
-                    if child.tag == "subject":
-                        return parse_subject(child)
-        raise Exception(
-            "Malformed XML document"
-        )  # TODO: it'd be nice to have an XML schema to validate the file against
-
-    def find_nifti(self, subject_id, event_id, description):
-        """
-        Find the nifti file associated with subject, event and protocol description
-        in the finder's download directory.
-        Raise an exception if file is not found: make sure you know what you're looking for!
-
-        Parameters:
-        * subject_id: Subject id of the sought file.
-        * event_id: Event id of the file. Example: "V06". Warning: this is not the
-         image visit id but a one-to-one mapping exists (see self.visit_map).
-        * description: Protocol description of the file. Example: "MPRAGE GRAPPA".
-
-        Return values:
-        * Nifti file path corresponding to the subject, event, and protocol description.
-        * None if no file path is found
-        """
-
-        def clean_desc(desc):
-            return (
-                desc.replace(" ", "_")
-                .replace("(", "_")
-                .replace(")", "_")
-                .replace("/", "_")
-            )
-
-        subject_id = str(subject_id)
-
-        # Find metadata file for subject, event and description
-        expression = op.join(self.download_dir, f"PPMI_{subject_id}_*.xml")
-        xml_files = glob.glob(expression)
-        # print(f'Found {len(xml_files)} metadata files to inspect')
-
-        for xml_file in xml_files:
-            (
-                s_id,
-                visit_id,
-                study_id,
-                series_id,
-                image_id,
-                descr,
-            ) = self.__parse_xml_metadata(xml_file)
-            if (
-                (subject_id == s_id)
-                and (self.visit_map[event_id] == visit_id)
-                and (description == descr)
-            ):
-                subject_dir = Path(self.download_dir, subject_id)
-                expression = f"**/PPMI_{subject_id}_MR_*_S{series_id}_I{image_id}.nii"
-                files = [
-                    filename
-                    for filename in subject_dir.glob(expression)
-                ]
-                if len(files) != 1:
-                    raise fileMatchingError(
-                        f"Found {len(files)} files matching {subject_dir / expression} while exactly 1 was expected\n"
-                    )
-                file_name = files[0]
-                return file_name
-            # else:
-            #     print(f'File {xml_file} is for {(s_id, visit_id, study_id, series_id, image_id, descr)} while we are looking for {subject_id, self.visit_map[event_id], description}')
-
-        return None
-        # raise Exception(
-        #     f"Did not find any nifti file for subject {subject_id}, event {event_id} and protocol description {description}"
-        # )
