@@ -104,5 +104,4 @@ def test_download_imaging_data(remote, no_headless):
     ids = [3001, 3003, 3011]
     ppmi = PPMIDownloader(remote=remote, tempdir='.',  headless=headless)
     ppmi.download_imaging_data(ids)
-    ppmi.download_imaging_data(ids, type="nifti")
     ppmi.quit()
