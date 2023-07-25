@@ -4,6 +4,7 @@ import random
 import tempfile
 from configparser import ConfigParser
 
+import pandas as pd
 import pytest
 from ppmi_downloader.ppmi_downloader import PPMIDownloader
 
@@ -100,7 +101,13 @@ def test_download_3D_T1_info(remote, no_headless):
 
 def test_download_imaging_data(remote, no_headless):
     headless = not no_headless
-    ids = [3001, 3003, 3011]
+    cohort = pd.DataFrame(
+        {
+            "PATNO": [3001, 3003, 3011],
+            "EVENT_ID": ["BL", "BL", "BL"],
+            "Description": ["AX T2 FLAIR 5/1", "AX T2 FLAIR 5/1", "AX T2 FLAIR 5/1"],
+        }
+    )
     ppmi = PPMIDownloader(remote=remote, tempdir=".", headless=headless)
-    ppmi.download_imaging_data(ids)
+    ppmi.download_imaging_data(cohort)
     ppmi.quit()

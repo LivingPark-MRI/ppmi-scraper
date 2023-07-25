@@ -1,5 +1,4 @@
 import getpass
-import glob
 import json
 import os
 import os.path as op
@@ -9,7 +8,6 @@ import signal
 import socket
 import string
 import tempfile
-import xml.etree.ElementTree as ET
 from configparser import ConfigParser
 from contextlib import contextmanager
 from pathlib import Path
@@ -18,6 +16,7 @@ from typing import Optional, List
 import tqdm
 from bs4 import BeautifulSoup
 from selenium import webdriver
+from selenium.webdriver.common.action_chains import ActionChains
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
@@ -30,6 +29,7 @@ from ppmi_downloader.ppmi_navigator import (
     PPMINavigator,
     ppmi_home_webpage,
     ppmi_main_webpage,
+    ppmi_query_page,
 )
 from .utils import cohort_id
 
@@ -104,8 +104,7 @@ def get_driver(headless: bool, tempdir: str, remote: Optional[str] = None):
         options.add_argument("--window-size=1920,1080")
 
     if remote is None:
-        ChromeDriverManager().install()
-        driver = webdriver.Chrome(options=options)
+        driver = webdriver.Chrome(ChromeDriverManager().install(), options=options)
     else:
         if remote == "hostname":
             remote = get_ip_hostname()
@@ -118,6 +117,7 @@ def get_driver(headless: bool, tempdir: str, remote: Optional[str] = None):
         if driver is None:
             logger.error("Unable to reach Remote selenium webdriver")
 
+    driver.set_window_size(1920, 1080)
     driver.maximize_window()
     return driver
 
@@ -319,7 +319,7 @@ class PPMIDownloader:
         and their corresponding checkbox id
         """
         self.init_and_log()
-        self.html.click_button_chain(["Search", "Advanced Image Search (beta)"])
+        self.driver.get(ppmi_query_page)
         soup = BeautifulSoup(self.driver.page_source, features="lxml")
         criteria_name_to_checkbox_id = self.crawl_checkboxes_id(soup)
         with open(cache_file, "w", encoding="utf-8") as fo:
@@ -347,17 +347,12 @@ class PPMIDownloader:
         if len(cohort) == 0:
             return
 
-        subjectIds = ",".join(cohort["PATNO"].unique())
+        subjectIds = ",".join(cohort["PATNO"].astype(str).unique())
 
         # Login to PPMI
         self.driver.get(ppmi_main_webpage)
         self.html.login(self.email, self.password)
-
-        # navigate to search page
-        self.driver.get(ppmi_home_webpage)
-        # click on 'Search'
-        # Click on 'Advanced Image Search (beta)'
-        self.html.click_button_chain(["Search", "Advanced Image Search (beta)"])
+        self.driver.get(ppmi_query_page)
 
         # Enter id's and add to collection
         self.html.enter_data("subjectIdText", subjectIds, By.ID)
@@ -371,13 +366,57 @@ class PPMIDownloader:
 
         self.html.click_button("export", By.ID)
 
-        # TODO select minimal set of images.
-        self.html.click_button("selectAllCheckBox", By.ID)
+        # Select only required images.
+        cohort_metadata = {
+            (str(row["PATNO"]), str(row["EVENT_ID"]), str(row["Description"]))
+            for _, row in cohort.iterrows()
+        }
+        print(cohort_metadata)
+        prev_rows = None
+        attempts = 0
+        while attempts < 3:
+            self.html.wait_for_element_to_be_visible("tableData", By.ID)
+            table = self.driver.find_element(By.ID, "tableData")
+            rows = table.find_elements(By.TAG_NAME, "tr")
+            if rows == prev_rows:
+                attempts += 1
+            else:
+                attempts = 0
+                for row in rows:
+                    metadata = tuple(
+                        (
+                            x.strip()
+                            for i, x in enumerate(row.text.split("\n"))
+                            if i in [0, 4, 6]
+                        )
+                    )
+                    if metadata in cohort_metadata:
+                        value = row.find_element(By.NAME, "checkbox").get_dom_attribute(
+                            "value"
+                        )
+                        self.html.click_button(
+                            f"//div[@id='tableData']//input[@value='{value}']"
+                        )
+
+                # Scroll down the table.
+                # For some reason, there's a second button that appears with the crawler.
+                # The first button doesn't work...
+                scroll_down_button = self.driver.find_elements(
+                    By.XPATH,
+                    "//tbody[.//div[@id='slider']]//input[@alt='V' and @onclick]",
+                )[1]
+                ActionChains(self.driver).move_to_element(
+                    scroll_down_button
+                ).click().perform()
+                self.driver.implicitly_wait(0.2)
+
+            prev_rows = rows
 
         self.html.click_button("simple-download-button", By.ID)
 
         # Download imaging data and metadata
-        self.html.click_button("Zip File", By.PARTIAL_LINK_TEXT)
+        # Try to click on download button for 2 minutes before timing out.
+        self.html.click_button("Zip File", By.PARTIAL_LINK_TEXT, trials=24)
         self.html.click_button("Metadata", By.PARTIAL_LINK_TEXT)
 
         # Wait for download to complete
@@ -428,8 +467,7 @@ class PPMIDownloader:
         self.html.login(self.email, self.password)
 
         # navigate to metadata page
-        self.driver.get(ppmi_home_webpage)
-        self.html.click_button_chain(["Search", "Advanced Image Search (beta)"])
+        self.driver.get(ppmi_query_page)
 
         # Click 3D checkbox
         self.html.click_button("imgProtocol_checkBox1.Acquisition_Type.3D", By.ID)
