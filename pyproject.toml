@@ -21,6 +21,7 @@ dependencies = [
     "lxml",
     "tqdm",
     "beautifulsoup4",
+    "pandas",
     "pathspec",
     "spython",
 ]
