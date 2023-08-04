@@ -104,7 +104,7 @@ def get_driver(headless: bool, tempdir: str, remote: Optional[str] = None):
         options.add_argument("--window-size=1920,1080")
 
     if remote is None:
-        driver = webdriver.Chrome(manager, options=options)
+        driver = webdriver.Chrome(options=options)
     else:
         if remote == "hostname":
             remote = get_ip_hostname()
