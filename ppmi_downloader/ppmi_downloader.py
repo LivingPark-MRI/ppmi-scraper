@@ -80,7 +80,7 @@ def get_driver(headless: bool, tempdir: str, remote: Optional[str] = None):
     WebDriver
     """
     # Create Chrome webdriver
-    manager = ChromeDriverManager()
+    manager = ChromeDriverManager(driver_version="114.0.5735.90").install()
     options = webdriver.ChromeOptions()
     prefs = {
         "download.default_directory": tempdir,
@@ -104,7 +104,7 @@ def get_driver(headless: bool, tempdir: str, remote: Optional[str] = None):
         options.add_argument("--window-size=1920,1080")
 
     if remote is None:
-        driver = webdriver.Chrome(ChromeDriverManager().install(), options=options)
+        driver = webdriver.Chrome(options=options)
     else:
         if remote == "hostname":
             remote = get_ip_hostname()
