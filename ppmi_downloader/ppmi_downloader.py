@@ -1,5 +1,4 @@
 import getpass
-import glob
 import json
 import os
 import os.path as op
@@ -9,27 +8,30 @@ import signal
 import socket
 import string
 import tempfile
-import xml.etree.ElementTree as ET
 from configparser import ConfigParser
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Optional, List, Sequence
+from typing import Optional, List
 
 import tqdm
 from bs4 import BeautifulSoup
 from selenium import webdriver
+from selenium.webdriver.common.action_chains import ActionChains
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
 from webdriver_manager.chrome import ChromeDriverManager
 from packaging import version
+import pandas as pd
 
 import ppmi_downloader.ppmi_logger as logger
 from ppmi_downloader.ppmi_navigator import (
     PPMINavigator,
     ppmi_home_webpage,
     ppmi_main_webpage,
+    ppmi_query_page,
 )
+from .utils import cohort_id
 
 
 class fileMatchingError(Exception):
@@ -78,7 +80,7 @@ def get_driver(headless: bool, tempdir: str, remote: Optional[str] = None):
     WebDriver
     """
     # Create Chrome webdriver
-    manager = ChromeDriverManager()
+    manager = ChromeDriverManager(driver_version="114.0.5735.90").install()
     options = webdriver.ChromeOptions()
     prefs = {
         "download.default_directory": tempdir,
@@ -89,7 +91,9 @@ def get_driver(headless: bool, tempdir: str, remote: Optional[str] = None):
     if headless:
         try:
             # https://www.selenium.dev/blog/2023/headless-is-going-away/
-            if version.parse(manager.driver.get_browser_version()) < version.parse('109'):
+            if version.parse(manager.driver.get_browser_version()) < version.parse(
+                "109"
+            ):
                 options.add_argument("--headless")
             else:
                 options.add_argument("--headless=new")
@@ -100,10 +104,7 @@ def get_driver(headless: bool, tempdir: str, remote: Optional[str] = None):
         options.add_argument("--window-size=1920,1080")
 
     if remote is None:
-        ChromeDriverManager().install()
-        driver = webdriver.Chrome(
-            options=options
-        )
+        driver = webdriver.Chrome(options=options)
     else:
         if remote == "hostname":
             remote = get_ip_hostname()
@@ -116,6 +117,7 @@ def get_driver(headless: bool, tempdir: str, remote: Optional[str] = None):
         if driver is None:
             logger.error("Unable to reach Remote selenium webdriver")
 
+    driver.set_window_size(1920, 1080)
     driver.maximize_window()
     return driver
 
@@ -162,8 +164,7 @@ class PPMIDownloader:
         if self.remote is None:
             self.remote = os.getenv("PPMI_SINGULARITY_SELENIUM_REMOTE")
         self.__set_credentials(config_file)
-        self.tempdir = tempfile.TemporaryDirectory(
-            dir=os.path.abspath(tempdir))
+        self.tempdir = tempfile.TemporaryDirectory(dir=os.path.abspath(tempdir))
         self.driver = get_driver(
             headless=headless, tempdir=self.tempdir.name, remote=self.remote
         )
@@ -176,8 +177,7 @@ class PPMIDownloader:
         self._get_real_name()
 
         # Ids of the download checkboxes in the PPMI metadata download page
-        self.file_ids_path = Path(__file__).parent.joinpath(
-            self.file_ids_default_path)
+        self.file_ids_path = Path(__file__).parent.joinpath(self.file_ids_default_path)
         if not self.file_ids_path.exists():
             self.crawl_study_data(cache_file=self.file_ids_path)
 
@@ -262,8 +262,7 @@ class PPMIDownloader:
 
         with open(cache_file, "r", encoding="utf-8") as fi:
             self.guessed_to_real = json.load(fi)
-            self.real_to_guessed = {v: k for k,
-                                    v in self.guessed_to_real.items()}
+            self.real_to_guessed = {v: k for k, v in self.guessed_to_real.items()}
 
     def init_and_log(self) -> None:
         """
@@ -284,14 +283,12 @@ class PPMIDownloader:
                 if (href := checkbox.findNext()) is not None:
                     name = href.text
                     if name == "" or name is None:
-                        logger.warning(
-                            f"Found checkbox with no name {checkbox}")
+                        logger.warning(f"Found checkbox with no name {checkbox}")
                     else:
                         label_to_checkboxes_id[name.strip()] = checkbox_id
         return label_to_checkboxes_id
 
-    def crawl_study_data(
-            self, cache_file: str = "study_data_to_checkbox_id.json"):
+    def crawl_study_data(self, cache_file: str = "study_data_to_checkbox_id.json"):
         """
         Creates a mapping between Study data checkbox's name
         and their corresponding checkbox id
@@ -316,15 +313,13 @@ class PPMIDownloader:
         with open(cache_file, "w", encoding="utf-8") as fo:
             json.dump(study_name_to_checkbox_clean, fo, indent=0)
 
-    def crawl_advanced_search(
-            self, cache_file: str = "search_to_checkbox_id.json"):
+    def crawl_advanced_search(self, cache_file: str = "search_to_checkbox_id.json"):
         """
         Creates a mapping between Advances Search checkboxe's name
         and their corresponding checkbox id
         """
         self.init_and_log()
-        self.html.click_button_chain(
-            ["Search", "Advanced Image Search (beta)"])
+        self.driver.get(ppmi_query_page)
         soup = BeautifulSoup(self.driver.page_source, features="lxml")
         criteria_name_to_checkbox_id = self.crawl_checkboxes_id(soup)
         with open(cache_file, "w", encoding="utf-8") as fo:
@@ -332,7 +327,7 @@ class PPMIDownloader:
 
     def download_imaging_data(
         self,
-        subject_ids: List[int],
+        cohort: pd.DataFrame,
         timeout: float = 600,
         destination_dir: str = ".",
     ):
@@ -342,46 +337,86 @@ class PPMIDownloader:
 
         Parameters
         ----------
-        subject_ids: List[int]
-            list of subject ids
+        cohort: pd.DataFrame
+            cohort of subjects to download.
         timeout : bool
             file download timeout, in seconds
         destination_dir : str
             directory where to store the downloaded files
         """
-        if len(subject_ids) == 0:
+        if len(cohort) == 0:
             return
 
-        subjectIds = ",".join([str(i) for i in subject_ids])
+        subjectIds = ",".join(cohort["PATNO"].astype(str).unique())
 
         # Login to PPMI
         self.driver.get(ppmi_main_webpage)
         self.html.login(self.email, self.password)
-
-        # navigate to search page
-        self.driver.get(ppmi_home_webpage)
-        # click on 'Search'
-        # Click on 'Advanced Image Search (beta)'
-        self.html.click_button_chain(
-            ["Search", "Advanced Image Search (beta)"])
+        self.driver.get(ppmi_query_page)
 
         # Enter id's and add to collection
         self.html.enter_data("subjectIdText", subjectIds, By.ID)
         self.html.click_button("advSearchQuery", By.ID)
         self.html.Search_AdvancedImageSearchbeta_SelectAll()
         self.html.click_button("advResultAddCollectId", By.ID)
-        self.html.enter_data(
-            "nameText", f"images-{op.basename(self.tempdir.name)}", By.ID
-        )
+        # TODO If cohort already exist, don't create a new one.
+        self.html.enter_data("nameText", cohort_id(cohort), By.ID)
         self.html.click_button("nameText", By.ID)
         self.html.Search_AdvancedImageSearchbeta_AddToCollection_OK()
 
         self.html.click_button("export", By.ID)
-        self.html.click_button("selectAllCheckBox", By.ID)
+
+        # Select only required images.
+        cohort_metadata = {
+            (str(row["PATNO"]), str(row["EVENT_ID"]), str(row["Description"]))
+            for _, row in cohort.iterrows()
+        }
+        print(cohort_metadata)
+        prev_rows = None
+        attempts = 0
+        while attempts < 3:
+            self.html.wait_for_element_to_be_visible("tableData", By.ID)
+            table = self.driver.find_element(By.ID, "tableData")
+            rows = table.find_elements(By.TAG_NAME, "tr")
+            if rows == prev_rows:
+                attempts += 1
+            else:
+                attempts = 0
+                for row in rows:
+                    metadata = tuple(
+                        (
+                            x.strip()
+                            for i, x in enumerate(row.text.split("\n"))
+                            if i in [0, 4, 6]
+                        )
+                    )
+                    if metadata in cohort_metadata:
+                        value = row.find_element(By.NAME, "checkbox").get_dom_attribute(
+                            "value"
+                        )
+                        self.html.click_button(
+                            f"//div[@id='tableData']//input[@value='{value}']"
+                        )
+
+                # Scroll down the table.
+                # For some reason, there's a second button that appears with the crawler.
+                # The first button doesn't work...
+                scroll_down_button = self.driver.find_elements(
+                    By.XPATH,
+                    "//tbody[.//div[@id='slider']]//input[@alt='V' and @onclick]",
+                )[1]
+                ActionChains(self.driver).move_to_element(
+                    scroll_down_button
+                ).click().perform()
+                self.driver.implicitly_wait(0.2)
+
+            prev_rows = rows
+
         self.html.click_button("simple-download-button", By.ID)
 
         # Download imaging data and metadata
-        self.html.click_button("Zip File", By.PARTIAL_LINK_TEXT)
+        # Try to click on download button for 2 minutes before timing out.
+        self.html.click_button("Zip File", By.PARTIAL_LINK_TEXT, trials=24)
         self.html.click_button("Metadata", By.PARTIAL_LINK_TEXT)
 
         # Wait for download to complete
@@ -401,10 +436,11 @@ class PPMIDownloader:
 
         try:
             WebDriverWait(self.driver, timeout, poll_frequency=5).until(
-                download_complete)
+                download_complete
+            )
         except TimeoutException:
             self.quit()
-            logger.error("Timeout when downloading imaging data", subject_ids)
+            logger.error("Timeout when downloading imaging data")
         # Move file to cwd or extract zip file
         downloaded_files = os.listdir(self.tempdir.name)
 
@@ -413,9 +449,7 @@ class PPMIDownloader:
             downloaded_files, self.tempdir.name, destination_dir
         )
 
-    def download_3D_T1_info(
-        self, timeout: float = 120, destination_dir: str = "."
-    ):
+    def download_3D_T1_info(self, timeout: float = 120, destination_dir: str = "."):
         r"""Download csv file containing information about available 3D MRIs
 
         Parameters
@@ -433,13 +467,10 @@ class PPMIDownloader:
         self.html.login(self.email, self.password)
 
         # navigate to metadata page
-        self.driver.get(ppmi_home_webpage)
-        self.html.click_button_chain(
-            ["Search", "Advanced Image Search (beta)"])
+        self.driver.get(ppmi_query_page)
 
         # Click 3D checkbox
-        self.html.click_button(
-            "imgProtocol_checkBox1.Acquisition_Type.3D", By.ID)
+        self.html.click_button("imgProtocol_checkBox1.Acquisition_Type.3D", By.ID)
         # Click checkbox to display visit name in results
         self.html.click_button("RESET_VISIT.0", By.ID)
         # Click checkbox to display weighting in results
@@ -448,7 +479,8 @@ class PPMIDownloader:
         self.html.click_button("RESET_PROTOCOL_STRING.1_Manufacturer", By.ID)
         # Click checkbox to display slice thickness in results
         self.html.click_button(
-            "RESET_PROTOCOL_NUMERIC.imgProtocol_1_Slice_Thickness", By.ID)
+            "RESET_PROTOCOL_NUMERIC.imgProtocol_1_Slice_Thickness", By.ID
+        )
         # Click checkbox to display manufacturer model in results
         self.html.click_button("RESET_PROTOCOL_STRING.1_Mfg_Model", By.ID)
         # Click checkbox to display study date in results
@@ -458,8 +490,7 @@ class PPMIDownloader:
             "RESET_PROTOCOL_NUMERIC.imgProtocol_1_Field_Strength", By.ID
         )
         # Click checkbox to display acquisition plane in results
-        self.html.click_button(
-            "RESET_PROTOCOL_STRING.1_Acquisition_Plane", By.ID)
+        self.html.click_button("RESET_PROTOCOL_STRING.1_Acquisition_Plane", By.ID)
 
         # Click search button
         self.html.click_button("advSearchQuery", By.ID)
@@ -485,14 +516,14 @@ class PPMIDownloader:
 
         try:
             WebDriverWait(self.driver, timeout, poll_frequency=5).until(
-                download_complete)
+                download_complete
+            )
         except TimeoutException:
             self.quit()
             logger.error("Unable to download T1 3D information")
 
         # Move file to cwd or extract zip file
-        file_name = self.html.unzip_metadata(
-            self.tempdir.name, destination_dir)
+        file_name = self.html.unzip_metadata(self.tempdir.name, destination_dir)
 
         return file_name
 
@@ -518,13 +549,10 @@ class PPMIDownloader:
         if not isinstance(file_ids, list):
             file_ids = [file_ids]
 
-        supported_files = set(self.file_ids.keys()) | set(
-            self.real_to_guessed.keys())
+        supported_files = set(self.file_ids.keys()) | set(self.real_to_guessed.keys())
         for file_name in tqdm.tqdm(file_ids):
             if file_name not in supported_files:
-                raise Exception(
-                    f"Unsupported file name: {file_name}."
-                )
+                raise Exception(f"Unsupported file name: {file_name}.")
 
         # Login to PPMI
         self.driver.get(ppmi_main_webpage)
@@ -544,7 +572,7 @@ class PPMIDownloader:
                 guess = self.real_to_guessed[file_name]
                 checkbox_id = self.file_ids.get(guess)
             for checkbox in self.driver.find_elements(By.ID, checkbox_id)[0:2]:
-                logger.debug('Click checkbox', checkbox_id, file_name)
+                logger.debug("Click checkbox", checkbox_id, file_name)
                 checkbox.click()
 
         self.html.click_button("downloadBtn", By.ID)
@@ -566,7 +594,8 @@ class PPMIDownloader:
 
         try:
             WebDriverWait(self.driver, timeout, poll_frequency=5).until(
-                download_complete)
+                download_complete
+            )
         except TimeoutException as e:
             self.quit()
             raise e
