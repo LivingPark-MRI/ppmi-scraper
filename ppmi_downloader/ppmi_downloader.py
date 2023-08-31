@@ -563,17 +563,21 @@ class PPMIDownloader:
         self.html.click_button(
             "//td[@id='imgModHolder']//td/input[@value='1']", By.XPATH
         )
-        
-        # Click checkbox to display slice thickness in results
-        self.html.click_button(
-            "RESET_PROTOCOL_NUMERIC.imgProtocol_1_Slice_Thickness", By.ID
-        )
+
         # Click checkbox to display field strength in results
         self.html.click_button(
-            "RESET_PROTOCOL_NUMERIC.imgProtocol_1_Field_Strength", By.ID
+            "RESET_PROTOCOL_NUMERIC.imgProtocol_2_Field_Strength", By.ID
         )
+        # Click checkbox to display slice thickness in results
+        self.html.click_button(
+            "RESET_PROTOCOL_NUMERIC.imgProtocol_2_Slice_Thickness", By.ID
+        )
+        # Click checkbox to display TE in results
+        self.html.click_button("RESET_PROTOCOL_NUMERIC.imgProtocol_2_TE", By.ID)
+        # Click checkbox to display TR in results
+        self.html.click_button("RESET_PROTOCOL_NUMERIC.imgProtocol_2_TR", By.ID)
         # Click checkbox to display manufacturer in results
-        self.html.click_button("RESET_PROTOCOL_STRING.1_Manufacturer", By.ID)
+        self.html.click_button("RESET_PROTOCOL_STRING.2_Manufacturer", By.ID)
 
         # Click search button
         self.html.click_button("advSearchQuery", By.ID)
