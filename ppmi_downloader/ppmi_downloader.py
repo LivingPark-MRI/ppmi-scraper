@@ -469,6 +469,8 @@ class PPMIDownloader:
         # navigate to metadata page
         self.driver.get(ppmi_query_page)
 
+        # Click checkbox to display image ID.
+        self.html.click_button("RESET_MODALITY.1", By.ID)
         # Click 3D checkbox
         self.html.click_button("imgProtocol_checkBox1.Acquisition_Type.3D", By.ID)
         # Click checkbox to display visit name in results
@@ -521,6 +523,91 @@ class PPMIDownloader:
         except TimeoutException:
             self.quit()
             logger.error("Unable to download T1 3D information")
+
+        # Move file to cwd or extract zip file
+        file_name = self.html.unzip_metadata(self.tempdir.name, destination_dir)
+
+        return file_name
+
+    def download_fmri_info(self, timeout: float = 120, destination_dir: str = "."):
+        r"""Download csv file containing information about available fMRIs
+
+        Parameters
+        ----------
+        timeout : float
+            file download timeout, in seconds
+        destination_dir : str
+            directory where to store the downloaded files
+
+        """
+
+        # Login to PPMI
+        self.driver.get(ppmi_main_webpage)
+        # self.html = PPMINavigator(self.driver)
+        self.html.login(self.email, self.password)
+
+        # navigate to metadata page
+        self.driver.get(ppmi_query_page)
+
+        # Click checkbox to display study date in results
+        self.html.click_button("RESET_STUDY.0", By.ID)
+        # Click checkbox to display visit name in results
+        self.html.click_button("RESET_VISIT.0", By.ID)
+        # Click checkbox to display image ID.
+        self.html.click_button("RESET_MODALITY.1", By.ID)
+
+        # Click fMRI checkbox and deselect MRI one.
+        self.html.click_button(
+            "//td[@id='imgModHolder']//td/input[@value='2']", By.XPATH
+        )
+        self.html.click_button(
+            "//td[@id='imgModHolder']//td/input[@value='1']", By.XPATH
+        )
+
+        # Click checkbox to display field strength in results
+        self.html.click_button(
+            "RESET_PROTOCOL_NUMERIC.imgProtocol_2_Field_Strength", By.ID
+        )
+        # Click checkbox to display slice thickness in results
+        self.html.click_button(
+            "RESET_PROTOCOL_NUMERIC.imgProtocol_2_Slice_Thickness", By.ID
+        )
+        # Click checkbox to display TE in results
+        self.html.click_button("RESET_PROTOCOL_NUMERIC.imgProtocol_2_TE", By.ID)
+        # Click checkbox to display TR in results
+        self.html.click_button("RESET_PROTOCOL_NUMERIC.imgProtocol_2_TR", By.ID)
+        # Click checkbox to display manufacturer in results
+        self.html.click_button("RESET_PROTOCOL_STRING.2_Manufacturer", By.ID)
+
+        # Click search button
+        self.html.click_button("advSearchQuery", By.ID)
+        # Click CSV Download button
+        self.html.click_button('//*[@type="button" and @value="CSV Download"]')
+
+        # Wait for download to complete
+        def download_complete(driver):
+            downloaded_files = os.listdir(self.tempdir.name)
+            # assert len(downloaded_files) <= 1
+            if len(downloaded_files) == 0:
+                return False
+            for f in downloaded_files:
+                if f.endswith(".crdownload"):
+                    filename = os.path.join(self.tempdir.name, f)
+                    size = os.stat(filename).st_size
+                    logger.debug("Size", size)
+                    return False
+                if f.endswith(".csv"):
+                    return True
+            # assert f.endswith(".csv"), f"file ends with: {f}"
+            return True
+
+        try:
+            WebDriverWait(self.driver, timeout, poll_frequency=5).until(
+                download_complete
+            )
+        except TimeoutException:
+            self.quit()
+            logger.error("Unable to download fMRI information")
 
         # Move file to cwd or extract zip file
         file_name = self.html.unzip_metadata(self.tempdir.name, destination_dir)
