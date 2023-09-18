@@ -15,7 +15,7 @@ classifiers = [
 ]
 license = { file = "LICENSE" }
 dependencies = [
-    "webdriver_manager",
+    "webdriver_manager>=4.0.0",
     "selenium",
     "icecream",
     "lxml",

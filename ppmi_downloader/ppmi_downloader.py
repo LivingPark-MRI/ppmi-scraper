@@ -80,7 +80,7 @@ def get_driver(headless: bool, tempdir: str, remote: Optional[str] = None):
     WebDriver
     """
     # Create Chrome webdriver
-    manager = ChromeDriverManager(version="114.0.5735.90").install()
+    manager = ChromeDriverManager(driver_version="114.0.5735.90").install()
     options = webdriver.ChromeOptions()
     prefs = {
         "download.default_directory": tempdir,
