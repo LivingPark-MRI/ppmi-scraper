@@ -2,8 +2,6 @@ import getpass
 import json
 import os
 import os.path as op
-from pathlib import Path
-import pkg_resources
 import signal
 import socket
 import string
@@ -11,18 +9,19 @@ import tempfile
 from configparser import ConfigParser
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Optional, List
+from typing import List, Optional
 
+import pandas as pd
+import pkg_resources
 import tqdm
 from bs4 import BeautifulSoup
+from packaging import version
 from selenium import webdriver
-from selenium.webdriver.common.action_chains import ActionChains
 from selenium.common.exceptions import TimeoutException
+from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
 from webdriver_manager.chrome import ChromeDriverManager
-from packaging import version
-import pandas as pd
 
 import ppmi_downloader.ppmi_logger as logger
 from ppmi_downloader.ppmi_navigator import (
@@ -31,6 +30,7 @@ from ppmi_downloader.ppmi_navigator import (
     ppmi_main_webpage,
     ppmi_query_page,
 )
+
 from .utils import cohort_id
 
 
@@ -80,7 +80,8 @@ def get_driver(headless: bool, tempdir: str, remote: Optional[str] = None):
     WebDriver
     """
     # Create Chrome webdriver
-    manager = ChromeDriverManager(driver_version="114.0.5735.90").install()
+    manager = ChromeDriverManager(driver_version="114.0.5735.90")
+    manager.install()
     options = webdriver.ChromeOptions()
     prefs = {
         "download.default_directory": tempdir,
@@ -91,9 +92,9 @@ def get_driver(headless: bool, tempdir: str, remote: Optional[str] = None):
     if headless:
         try:
             # https://www.selenium.dev/blog/2023/headless-is-going-away/
-            if version.parse(manager.driver.get_browser_version()) < version.parse(
-                "109"
-            ):
+            if version.parse(
+                manager.driver.get_latest_release_version()
+            ) < version.parse("109"):
                 options.add_argument("--headless")
             else:
                 options.add_argument("--headless=new")

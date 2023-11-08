@@ -808,7 +808,7 @@ class PPMINavigator(HTMLHelper):
                 return not self.driver.find_element(
                     By.ID, "regroupDialog"
                 ).is_displayed()
-            except (NoSuchElementException):
+            except NoSuchElementException:
                 return True
             else:
                 return False
