@@ -87,7 +87,7 @@ def test_download_metadata(remote, no_headless):
         "Data_Dictionary_-__Annotated_.csv",
         "SCOPA-AUT.csv",
     ]
-    random_names = random.sample(filenames, min(3, len(filenames)))
+    random_names = random.sample(list(filenames), min(3, len(filenames)))
     ppmi.download_metadata(mismatched_names + random_names)
     ppmi.quit()
 
