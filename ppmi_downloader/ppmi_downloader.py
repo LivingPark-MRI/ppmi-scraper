@@ -81,7 +81,6 @@ def get_driver(headless: bool, tempdir: str, remote: Optional[str] = None):
     """
     # Create Chrome webdriver
     manager = ChromeDriverManager(driver_version="114.0.5735.90")
-    manager.install()
     options = webdriver.ChromeOptions()
     prefs = {
         "download.default_directory": tempdir,
@@ -171,7 +170,7 @@ class PPMIDownloader:
         )
         self.html = PPMINavigator(self.driver)
 
-        logger.debug(self.driver.desired_capabilities)
+        logger.debug(self.driver.capabilities)
         logger.debug(self.tempdir)
 
         # Load real metadata names
