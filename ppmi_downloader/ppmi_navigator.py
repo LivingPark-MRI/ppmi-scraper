@@ -1,3 +1,4 @@
+import inspect
 import json
 import os
 import os.path as op
@@ -5,7 +6,7 @@ import shutil
 import time
 import urllib.parse
 import zipfile
-from typing import Dict, List, Callable, Any
+from typing import Any, Callable, Dict, List
 
 import selenium.webdriver.support.expected_conditions as EC
 import tqdm
@@ -16,10 +17,11 @@ from selenium.common.exceptions import (
     TimeoutException,
     WebDriverException,
 )
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.chrome.webdriver import WebDriver as ChromeWebDriver
+from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebElement
+from selenium.webdriver.support.wait import WebDriverWait
+
 import ppmi_downloader.ppmi_logger as logger
 
 TIMEOUT = 5
@@ -57,6 +59,25 @@ class HTMLHelper:
         """
         self.driver = driver
 
+    def __parser_caller(self, caller: inspect.FrameInfo) -> str:
+        r"""Helper function to parse caller
+
+        Parameters
+        ----------
+        caller : inspect.FrameInfo
+            Caller information
+
+        Returns
+        -------
+        str
+            String representation of the caller
+
+        """
+        filename = os.path.basename(caller.filename)
+        function = caller.function
+        lineno = caller.lineno
+        return f"{filename}:{lineno} {function}"
+
     def take_screenshot(self, function: str) -> None:
         r"""Take screenshot of the driver current page
 
@@ -68,7 +89,7 @@ class HTMLHelper:
         time_ns = time.time_ns()
         filename = f"error-{function}-{time_ns}"
         with open(f"{filename}.json", "w") as fo:
-            json.dump(self.driver.desired_capabilities, fo)
+            json.dump(self.driver.capabilities, fo)
         self.driver.get_screenshot_as_file(f"{filename}.png")
 
     def wait_for_element_to_be_visible(
@@ -188,12 +209,16 @@ class HTMLHelper:
             Number of trials before quiting
 
         """
+        stack = inspect.stack()
+        caller = self.__parser_caller(stack[1]) if len(stack) > 1 else ""
+
         if trials < 0:
             self.take_screenshot("click_button")
             self.driver.quit()
             logger.error("Number of trials is exceeded")
         try:
-            logger.debug("Click button", field, debug_name)
+            current_url = self.driver.current_url
+            logger.debug("Click button", field, debug_name, caller, current_url)
             predicate = EC.element_to_be_clickable((BY, field))
             button = WebDriverWait(self.driver, TIMEOUT, poll_frequency=1).until(
                 predicate
@@ -640,8 +665,12 @@ class PPMINavigator(HTMLHelper):
         Click on button until postcondition is not met
         """
         studydata_url = "https://ida.loni.usc.edu/pages/access/studyData.jsp"
-        while self.driver.current_url != studydata_url:
-            self.click_button("ygtvlabelel76", BY=By.ID, debug_name="ALL")
+        while not self.driver.current_url == studydata_url:
+            # Need to click on ALL tab first to be able to see all checkboxes
+            # See screenshots_errors/Screenshot_error_ALL_06-12-2023.jpg
+            self.click_button("ygtvlabelel77", BY=By.ID, debug_name="ALL tab")
+        while not self.driver.current_url.startswith(studydata_url):
+            self.click_button("sCatChkBox_312", BY=By.ID, debug_name="ALL checkbox")
 
     def Download_ImageCollections(self) -> None:
         r"""Action to click on "Image Collections" in "Download"
