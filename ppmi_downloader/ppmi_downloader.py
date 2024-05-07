@@ -294,7 +294,10 @@ class PPMIDownloader:
         and their corresponding checkbox id
         """
         self.init_and_log()
-        self.html.click_button_chain(["Download", "Study Data", "ALL"])
+        self.html.click_button_chain(["Download", "Study Data"])
+        self.html.click_button(
+            '//*[@id="categoryMenuTree"]//*[@class="ida-studyData-category"][text()="ALL"]'
+        )
         soup = BeautifulSoup(self.driver.page_source, features="lxml")
         study_name_to_checkbox = self.crawl_checkboxes_id(soup)
 
@@ -648,7 +651,10 @@ class PPMIDownloader:
 
         # navigate to metadata page
         self.driver.get(ppmi_home_webpage)
-        self.html.click_button_chain(["Download", "Study Data", "ALL"])
+        self.html.click_button_chain(["Download", "Study Data"])
+        self.html.click_button(
+            '//*[@id="categoryMenuTree"]//*[@class="ida-studyData-category"][text()="ALL"]',
+        )
 
         # select file and download
         for file_name in file_ids:
