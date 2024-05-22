@@ -668,7 +668,7 @@ class PPMINavigator(HTMLHelper):
         while not self.driver.current_url == studydata_url:
             # Need to click on ALL tab first to be able to see all checkboxes
             # See screenshots_errors/Screenshot_error_ALL_06-12-2023.jpg
-            self.click_button("ygtvlabelel77", BY=By.ID, debug_name="ALL tab")
+            self.click_button("ygtvlabelel78", BY=By.ID, debug_name="ALL tab")
         while not self.driver.current_url.startswith(studydata_url):
             self.click_button("sCatChkBox_312", BY=By.ID, debug_name="ALL checkbox")
 
