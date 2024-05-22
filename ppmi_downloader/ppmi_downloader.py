@@ -373,7 +373,6 @@ class PPMIDownloader:
             (str(row["PATNO"]), str(row["EVENT_ID"]), str(row["Description"]))
             for _, row in cohort.iterrows()
         }
-        print(cohort_metadata)
         prev_rows = None
         attempts = 0
         while attempts < 3:
