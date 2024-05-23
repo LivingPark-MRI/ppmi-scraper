@@ -668,9 +668,12 @@ class PPMINavigator(HTMLHelper):
         while not self.driver.current_url == studydata_url:
             # Need to click on ALL tab first to be able to see all checkboxes
             # See screenshots_errors/Screenshot_error_ALL_06-12-2023.jpg
-            self.click_button("ygtvlabelel78", BY=By.ID, debug_name="ALL tab")
-        while not self.driver.current_url.startswith(studydata_url):
-            self.click_button("sCatChkBox_312", BY=By.ID, debug_name="ALL checkbox")
+
+
+            self.click_button(
+                '//*[@id="categoryMenuTree"]//*[@class="ida-studyData-category"][text()="ALL"]',
+                debug_name="ALL tab",
+            )
 
     def Download_ImageCollections(self) -> None:
         r"""Action to click on "Image Collections" in "Download"
