@@ -669,6 +669,7 @@ class PPMINavigator(HTMLHelper):
             # Need to click on ALL tab first to be able to see all checkboxes
             # See screenshots_errors/Screenshot_error_ALL_06-12-2023.jpg
 
+
             self.click_button(
                 '//*[@id="categoryMenuTree"]//*[@class="ida-studyData-category"][text()="ALL"]',
                 debug_name="ALL tab",

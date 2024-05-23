@@ -1,4 +1,5 @@
 import getpass
+import importlib.resources
 import json
 import os
 import os.path as op
@@ -12,7 +13,6 @@ from pathlib import Path
 from typing import List, Optional
 
 import pandas as pd
-import pkg_resources
 import tqdm
 from bs4 import BeautifulSoup
 from packaging import version
@@ -256,13 +256,15 @@ class PPMIDownloader:
         Initialize the attribute mapping guessed names from
         crawling PPMI to actual downloaded files.
         """
-        cache_file = pkg_resources.resource_filename(
-            "ppmi_downloader", "guessed_to_real.json"
+
+        cache_file = (
+            importlib.resources.files("ppmi_downloader") / "guessed_to_real.json"
         )
 
-        with open(cache_file, "r", encoding="utf-8") as fi:
-            self.guessed_to_real = json.load(fi)
-            self.real_to_guessed = {v: k for k, v in self.guessed_to_real.items()}
+        with importlib.resources.as_file(cache_file) as cache_file:
+            with open(cache_file, "r", encoding="utf-8") as fi:
+                self.guessed_to_real = json.load(fi)
+                self.real_to_guessed = {v: k for k, v in self.guessed_to_real.items()}
 
     def init_and_log(self) -> None:
         """
@@ -371,7 +373,6 @@ class PPMIDownloader:
             (str(row["PATNO"]), str(row["EVENT_ID"]), str(row["Description"]))
             for _, row in cohort.iterrows()
         }
-        print(cohort_metadata)
         prev_rows = None
         attempts = 0
         while attempts < 3:
