@@ -356,6 +356,25 @@ class PPMIDownloader:
         self.html.login(self.email, self.password)
         self.driver.get(ppmi_query_page)
 
+        # Select all modalities
+        self.html.click_button(
+            "//*[@id='imgModHolder']//td[./label[starts-with(., 'CT')]]/input"
+        )
+        self.html.click_button(
+            "//*[@id='imgModHolder']//td[./label[starts-with(., 'DTI')]]/input"
+        )
+        self.html.click_button(
+            "//*[@id='imgModHolder']//td[./label[starts-with(., 'PET')]]/input"
+        )
+        self.html.click_button(
+            "//*[@id='imgModHolder']//td[./label[starts-with(., 'Path')]]/input"
+        )
+        self.html.click_button(
+            "//*[@id='imgModHolder']//td[./label[starts-with(., 'SPECT')]]/input"
+        )
+        self.html.click_button(
+            "//*[@id='imgModHolder']//td[./label[starts-with(., 'fMRI')]]/input"
+        )
         # Enter id's and add to collection
         self.html.enter_data("subjectIdText", subjectIds, By.ID)
         self.html.click_button("advSearchQuery", By.ID)
